@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>לקוחות</title>
+  <style>
+    :root{--bg:#fff;--fg:#1f2937;--muted:#6b7280;--line:#e5e7eb;--header:#f8fafc;--accent:#3b82f6;}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.4 system-ui;direction:rtl}
+    .wrap{max-width:1200px;margin:18px auto;padding:0 10px}
+    .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:6px}
+    .search{flex:0 0 300px;display:flex;align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+    .search input{border:none;outline:none;flex:1;font:inherit}
+    .search input::placeholder{color:var(--muted)}
+    .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff;border-color:transparent}
+    .pager{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
+    .iconbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 8px;cursor:pointer}
+    .iconbtn.danger{border-color:#fecaca;background:#fff1f2;color:#991b1b}
+    .pagenum{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;min-width:32px;text-align:center}
+    .table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+    th,td{padding:12px 10px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}
+    td:nth-child(3){text-align:right} /* Phone column alignment */
+    thead th{background:var(--header);font-weight:700;color:#111827;border-bottom:1px solid var(--line)}
+    thead th:not(:first-child), tbody td:not(:first-child){border-inline-start:1px solid var(--line)}
+    tbody tr:hover{background:#fbfdff}
+    tbody tr:nth-child(even){background:#f9fbff}
+    tbody tr:last-child td{border-bottom:0}
+    .num{text-align:right}
+    .chip{display:inline-block;background:#eef2ff;color:#1e3a8a;border-radius:999px;padding:.2rem .6rem;font-weight:600;font-size:12px}
+    /* Compact delete column */
+    #clients col.shrink{width:1%}
+    #clients th:last-child, #clients td:last-child{white-space:nowrap}
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+    .modal-content{background:#fff;padding:20px;border-radius:10px;width:320px;max-width:90vw;max-height:90vh;overflow-y:auto}
+    .modal.hidden{display:none !important}
+    .modal label{display:block;margin:8px 0 4px}
+    .modal input{width:100%;padding:6px;border:1px solid var(--line);border-radius:6px}
+    /* Loading and feedback states */
+    .loading{opacity:0.6;pointer-events:none}
+    .spinner{display:inline-block;width:16px;height:16px;border:2px solid #f3f3f3;border-top:2px solid var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+    .toast{position:fixed;top:20px;right:20px;background:var(--accent);color:#fff;padding:12px 20px;border-radius:8px;z-index:1000;transform:translateX(calc(100% + 50px));transition:transform 0.3s ease}
+    .toast.show{transform:translateX(0)}
+    .toast.error{background:#dc2626}
+    .toast.success{background:#059669}
+    /* Inline editing */
+    .editable{cursor:pointer;border-radius:4px;padding:2px 4px;transition:background-color 0.2s}
+    .editable:hover{background:#f3f4f6}
+    .editable input{border:1px solid var(--accent);background:#fff;padding:4px 6px;border-radius:4px;font:inherit;width:100%}
+    .editable.editing{background:#fff}
+    /* Sortable columns */
+    .sortable{cursor:pointer;user-select:none;position:relative;transition:background-color 0.2s}
+    .sortable:hover{background:#f0f4f8}
+    .sortable::after{content:"↕";position:absolute;left:8px;opacity:0.5;font-size:12px}
+    .sortable.asc::after{content:"↑";opacity:1}
+    .sortable.desc::after{content:"↓";opacity:1}
+    
+    /* Mobile card layout */
+    .cards-container {
+      display: none;
+      gap: 12px;
+    }
+    
+    .client-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .card-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--fg);
+      margin: 0;
+    }
+    
+    .card-id-phone {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: left;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: #10b981;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    
+    .card-data {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    
+    .data-item {
+      text-align: center;
+      flex: 1;
+    }
+    
+    .data-label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    
+    .data-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--fg);
+    }
+    
+    .card-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .card-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .card-btn.delete {
+      background: #fff1f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+    
+    .card-btn.edit {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: #3730a3;
+    }
+    
+    .card-btn:hover {
+      opacity: 0.8;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+      .wrap{padding:0 12px;margin:12px auto}
+      
+      /* Hide table, show cards */
+      .table{display:none}
+      .cards-container{display:block}
+      
+      /* Mobile toolbar layout */
+      .toolbar{
+        display:grid;
+        grid-template-columns:1fr;
+        gap:12px;
+        align-items:stretch
+      }
+      
+      .search{
+        width:100%;
+        max-width:none;
+        flex:none;
+        grid-row:1;
+        grid-column:1
+      }
+      
+      .btn.primary{
+        flex-shrink:0;
+        white-space:nowrap;
+        padding:8px 12px;
+        font-size:14px;
+        grid-row:2;
+        grid-column:1;
+        justify-self:start
+      }
+      
+      .pager{
+        margin-inline-start:0;
+        justify-content:flex-start;
+        flex-shrink:0;
+        display:flex;
+        gap:6px;
+        align-items:center;
+        grid-row:2;
+        grid-column:1;
+        justify-self:end
+      }
+      
+      .modal-content{width:90vw;margin:20px;padding:16px}
+      .toast{right:10px;left:10px;top:10px;transform:translateY(-200px)}
+      .toast.show{transform:translateY(0)}
+    }
+    
+    @media (max-width: 480px) {
+      .wrap{padding:0 8px}
+      .client-card{padding:12px}
+      .card-name{font-size:16px}
+      .data-value{font-size:14px}
+      .card-btn{padding:6px 10px;font-size:13px}
+      .search input{font-size:16px} /* Prevents zoom on iOS */
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="search"><input type="search" id="q" placeholder="חיפוש…" oninput="filterRows()"></div>
+      <button class="btn primary" onclick="openAddModal()">+ הוסף לקוח</button>
+      <div class="pager">
+        <button class="iconbtn" title="הקודם">❮</button>
+        <span class="pagenum" id="pageNo">1</span>
+        <button class="iconbtn" title="הבא">❯</button>
+      </div>
+    </div>
+
+    <table class="table" id="clients">
+      <colgroup>
+        <col class="shrink"><col><col><col><col><col>
+        <col class="shrink">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortTable(0)">מסי לקוח</th>
+          <th class="sortable" onclick="sortTable(1)">שם לקוח</th>
+          <th class="sortable" onclick="sortTable(2)">טלפון</th>          <th class="sortable num" onclick="sortTable(3)">סהוכ לתשלום</th>
+          <th class="sortable num" onclick="sortTable(4)">תקבולים</th>
+          <th class="sortable num" onclick="sortTable(5)">יתרת חוב</th>
+          <th>מחיקה</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CL-001</td>
+          <td><a href="treatments list.html?id=1">נועה לוי</a></td>
+          <td>050-1234567</td>
+          <td class="num">₪ 3,500</td>
+          <td class="num">₪ 2,000</td>
+          <td class="num">₪ 1,500</td>
+          <td><button class="iconbtn danger">🗑</button></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Mobile Cards Container -->
+    <div class="cards-container" id="cardsContainer">
+      <!-- Cards will be dynamically generated here -->
+    </div>
+  </div>
+
+  <!-- Toast notifications -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Add Client Modal -->
+  <div class="modal hidden" id="addModal">
+    <div class="modal-content">
+      <h3>הוסף לקוח חדש</h3>
+      <label>שם לקוח</label><input id="custName">
+      <label>טלפון</label><input id="custPhone">
+      <!-- requested: totals in the same popup -->
+      <label>סהוכ לתשלום (ILS)</label><input id="totalDue" type="number" step="0.01" placeholder="0">
+      <label>תקבולים (ILS)</label><input id="paidAmt" type="number" step="0.01" placeholder="0">
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn" onclick="closeAddModal()">ביטול</button>
+        <button class="btn" onclick="addClient()">שמור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Client Modal -->
+  <div class="modal hidden" id="editModal">
+    <div class="modal-content">
+      <h3>ערוך לקוח</h3>
+      <label>שם לקוח</label><input id="editCustName">
+      <label>טלפון</label><input id="editCustPhone">
+      <label>סהוכ לתשלום (ILS)</label><input id="editTotalDue" type="number" step="0.01" placeholder="0">
+      <label>תקבולים (ILS)</label><input id="editPaidAmt" type="number" step="0.01" placeholder="0">
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn" onclick="closeEditModal()">ביטול</button>
+        <button class="btn" onclick="saveClientEdit()">שמור</button>
+      </div>
+    </div>
+  </div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  // Supabase client (your project credentials)
+  const supabase = window.supabase.createClient(
+    "https://bneeivzzmfcslhwneccr.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuZWVpdnp6bWZjc2xod25lY2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNzMxMjcsImV4cCI6MjA3MTk0OTEyN30.7ojWOfMyaGDwBRt2qcl3sVoAaI5Dwn1wLXuhCxD6hpo"
+  );
+
+  async function loadClients(){
+    const { data, error } = await supabase
+      .from("לקוחות")
+      .select("*")
+      .order("שם לקוח", { ascending: true });
+    if(error){ alert(error.message); return; }
+    
+    // Load table data
+    const tbody = document.querySelector("#clients tbody");
+    tbody.innerHTML = "";
+    
+    // Load cards data
+    const cardsContainer = document.querySelector("#cardsContainer");
+    cardsContainer.innerHTML = "";
+    
+    (data||[]).forEach(row=>{
+      // Table row
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row["מזהה"]||""}</td>
+        <td>
+          <a href="treatments list.html?id=${row['מזהה']}">
+            ${row["שם לקוח"]||""}
+          </a>
+        </td>
+        <td>${row["טלפון"]||""}</td>
+        <td class="num">₪ ${fmt(row["סהוכ לתשלום"])}</td>
+        <td class="num">₪ ${fmt(row["תקבולים"])}</td>
+        <td class="num">₪ ${fmt((row["סהוכ לתשלום"] || 0) - (row["תקבולים"] || 0))}</td>
+        <td>
+          <button class="btn" onclick="editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', ${row["סהוכ לתשלום"]||0}, ${row["תקבולים"]||0})">✏️</button>
+          <button class="btn" onclick="deleteClient(${row['מזהה']})">🗑</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      
+      // Card
+      const card = document.createElement("div");
+      card.className = "client-card";
+      card.setAttribute("data-client-id", row["מזהה"]);
+      
+      const totalDue = row["סהוכ לתשלום"] || 0;
+      const paid = row["תקבולים"] || 0;
+      const balance = totalDue - paid;
+      const progressPercent = totalDue > 0 ? (paid / totalDue) * 100 : 0;
+      
+      // Determine progress bar color based on payment status
+      let progressColor = "#10b981"; // Green for good progress
+      if (progressPercent === 0) progressColor = "#ef4444"; // Red for no payment
+      else if (progressPercent < 50) progressColor = "#f59e0b"; // Orange for low payment
+      else if (progressPercent < 100) progressColor = "#3b82f6"; // Blue for partial payment
+      
+      card.innerHTML = `
+        <div class="card-header">
+          <h3 class="card-name">
+            <a href="treatments list.html?id=${row['מזהה']}" style="color: inherit; text-decoration: none;">
+              ${row["שם לקוח"]||""}
+            </a>
+          </h3>
+          <div class="card-id-phone">
+            מס' ${row["מזהה"]||""} • ${row["טלפון"]||""}
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" style="width: ${Math.min(progressPercent, 100)}%; background: ${progressColor}"></div>
+        </div>
+        <div class="card-data">
+          <div class="data-item">
+            <div class="data-label">סה"כ</div>
+            <div class="data-value">₪ ${fmt(totalDue)}</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">תקבולים</div>
+            <div class="data-value">₪ ${fmt(paid)}</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">יתרה</div>
+            <div class="data-value">₪ ${fmt(balance)}</div>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="card-btn delete" onclick="deleteClient(${row['מזהה']})">מחיקה</button>
+          <button class="card-btn edit" onclick="editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', ${totalDue}, ${paid})">עריכה</button>
+        </div>
+      `;
+      cardsContainer.appendChild(card);
+    });
+  }
+
+  function fmt(v){ const n=Number(v||0); return n.toLocaleString('he-IL'); }
+
+  // Toast notification system
+  function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast ${type} show`;
+    setTimeout(() => {
+      toast.className = `toast ${type}`;
+    }, 3000);
+  }
+
+  // Loading state management
+  function setLoading(element, isLoading) {
+    if (isLoading) {
+      element.classList.add('loading');
+      const spinner = document.createElement('span');
+      spinner.className = 'spinner';
+      spinner.id = 'loading-spinner';
+      element.appendChild(spinner);
+    } else {
+      element.classList.remove('loading');
+      const spinner = document.getElementById('loading-spinner');
+      if (spinner) spinner.remove();
+    }
+  }
+
+  // Inline editing functionality
+  function editField(event, clientId, fieldName, currentValue) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const element = event.target;
+    const originalText = element.textContent;
+    
+    // Create input field
+    const input = document.createElement('input');
+    input.value = currentValue;
+    input.className = 'editable-input';
+    
+    // Replace text with input
+    element.innerHTML = '';
+    element.appendChild(input);
+    element.classList.add('editing');
+    
+    // Focus and select text
+    input.focus();
+    input.select();
+    
+    // Save function
+    const save = async () => {
+      const newValue = input.value.trim();
+      
+      if (newValue === currentValue) {
+        // No change, revert
+        element.innerHTML = originalText;
+        element.classList.remove('editing');
+        return;
+      }
+      
+      // Validate phone number if it's the phone field
+      if (fieldName === 'טלפון' && newValue && !/^[\d\-\+\(\)\s]+$/.test(newValue)) {
+        showToast("מספר הטלפון אינו תקין", "error");
+        input.focus();
+        return;
+      }
+      
+      // Validate name if it's the name field
+      if (fieldName === 'שם לקוח' && !newValue) {
+        showToast("שם הלקוח הוא שדה חובה", "error");
+        input.focus();
+        return;
+      }
+      
+      try {
+        const { error } = await supabase
+          .from('לקוחות')
+          .update({ [fieldName]: newValue })
+          .eq('מזהה', clientId);
+        
+        if (error) throw error;
+        
+        element.innerHTML = newValue;
+        element.classList.remove('editing');
+        showToast("השדה עודכן בהצלחה!");
+      } catch (error) {
+        console.error('Error updating field:', error);
+        showToast("שגיאה בעדכון השדה: " + error.message, "error");
+        element.innerHTML = originalText;
+        element.classList.remove('editing');
+      }
+    };
+    
+    // Cancel function
+    const cancel = () => {
+      element.innerHTML = originalText;
+      element.classList.remove('editing');
+    };
+    
+    // Event listeners
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        save();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancel();
+      }
+    });
+  }
+
+  async function addClient(){
+    const name = document.getElementById("custName").value.trim();
+    const phone = document.getElementById("custPhone").value.trim();
+    const total = Number(document.getElementById("totalDue").value||0);
+    const paid  = Number(document.getElementById("paidAmt").value||0);
+    
+    // Input validation
+    if(!name){ 
+      showToast("שם הלקוח הוא שדה חובה", "error");
+      return; 
+    }
+    
+    if(phone && !/^[\d\-\+\(\)\s]+$/.test(phone)) {
+      showToast("מספר הטלפון אינו תקין", "error");
+      return;
+    }
+
+    const saveBtn = document.querySelector('#addModal button:last-child');
+    setLoading(saveBtn, true);
+
+    try {
+      // Insert client with all financial data in one record
+      const { data: inserted, error: e1 } = await supabase
+        .from("לקוחות")
+        .insert([{ 
+          "שם לקוח": name, 
+          "טלפון": phone,
+          "סהוכ לתשלום": total,
+          "תקבולים": paid
+        }])
+        .select('"מזהה"')
+        .single();
+      if(e1) throw e1;
+
+      showToast("הלקוח נוסף בהצלחה!");
+      closeAddModal();
+      await loadClients();
+    } catch (error) {
+      console.error('Error adding client:', error);
+      showToast("שגיאה בהוספת הלקוח: " + error.message, "error");
+    } finally {
+      setLoading(saveBtn, false);
+    }
+  }
+
+  async function deleteClient(id){
+    if(!confirm("למחוק לקוח זה?")) return;
+    
+    try {
+      const { error } = await supabase.from("לקוחות").delete().eq("מזהה", id);
+      if(error) throw error;
+      
+      showToast("הלקוח נמחק בהצלחה!");
+      await loadClients();
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      showToast("שגיאה במחיקת הלקוח: " + error.message, "error");
+    }
+  }
+
+  // Sorting functionality
+  let currentSort = { column: -1, direction: 'asc' };
+  
+  function sortTable(columnIndex) {
+    const tbody = document.querySelector("#clients tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    
+    // Determine sort direction
+    if (currentSort.column === columnIndex) {
+      currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort.direction = 'asc';
+    }
+    currentSort.column = columnIndex;
+    
+    // Update header classes
+    document.querySelectorAll(".sortable").forEach((th, index) => {
+      th.classList.remove('asc', 'desc');
+      if (index === columnIndex) {
+        th.classList.add(currentSort.direction);
+      }
+    });
+    
+    // Sort rows
+    rows.sort((a, b) => {
+      const aCell = a.cells[columnIndex];
+      const bCell = b.cells[columnIndex];
+      
+      let aValue = aCell.textContent.trim();
+      let bValue = bCell.textContent.trim();
+      
+      // Handle numeric columns (3, 4, 5 are money columns)
+      if ([3, 4, 5].includes(columnIndex)) {
+        aValue = parseFloat(aValue.replace(/[₪,\s]/g, '')) || 0;
+        bValue = parseFloat(bValue.replace(/[₪,\s]/g, '')) || 0;
+      }
+      
+      if (currentSort.direction === 'asc') {
+        return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      } else {
+        return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+      }
+    });
+    
+    // Re-append sorted rows
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  function filterRows(){
+    const q = document.getElementById("q").value.trim().toLowerCase();
+    
+    // Filter table rows
+    document.querySelectorAll("#clients tbody tr").forEach(tr => {
+      const cells = tr.querySelectorAll("td");
+      let found = false;
+      
+      // Search through all cells
+      cells.forEach((cell, index) => {
+        if (index === 6) return; // Skip delete column
+        
+        const cellText = cell.textContent.toLowerCase();
+        if (cellText.includes(q)) {
+          found = true;
+        }
+      });
+      
+      tr.style.display = found ? "" : "none";
+    });
+    
+    // Filter cards
+    document.querySelectorAll(".client-card").forEach(card => {
+      const cardText = card.textContent.toLowerCase();
+      const found = cardText.includes(q);
+      card.style.display = found ? "" : "none";
+    });
+  }
+
+
+  function openAddModal(){ 
+    document.getElementById("addModal").classList.remove("hidden");
+    // Clear form
+    document.getElementById("custName").value = "";
+    document.getElementById("custPhone").value = "";
+    document.getElementById("totalDue").value = "";
+    document.getElementById("paidAmt").value = "";
+  }
+  function closeAddModal(){ document.getElementById("addModal").classList.add("hidden"); }
+
+  // Edit client functionality
+  let currentEditId = null;
+  
+  function editClient(id, name, phone, total, paid) {
+    currentEditId = id;
+    document.getElementById("editCustName").value = name;
+    document.getElementById("editCustPhone").value = phone;
+    document.getElementById("editTotalDue").value = total;
+    document.getElementById("editPaidAmt").value = paid;
+    document.getElementById("editModal").classList.remove("hidden");
+  }
+  
+  function closeEditModal() {
+    document.getElementById("editModal").classList.add("hidden");
+    currentEditId = null;
+  }
+  
+  async function saveClientEdit() {
+    const name = document.getElementById("editCustName").value.trim();
+    const phone = document.getElementById("editCustPhone").value.trim();
+    const total = Number(document.getElementById("editTotalDue").value || 0);
+    const paid = Number(document.getElementById("editPaidAmt").value || 0);
+    
+    if (!name) {
+      showToast("שם הלקוח הוא שדה חובה", "error");
+      return;
+    }
+    
+    if (phone && !/^[\d\-\+\(\)\s]+$/.test(phone)) {
+      showToast("מספר הטלפון אינו תקין", "error");
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from("לקוחות")
+        .update({ 
+          "שם לקוח": name, 
+          "טלפון": phone,
+          "סהוכ לתשלום": total,
+          "תקבולים": paid
+        })
+        .eq("מזהה", currentEditId);
+      
+      if (error) throw error;
+      
+      showToast("הלקוח עודכן בהצלחה!");
+      closeEditModal();
+      await loadClients();
+    } catch (error) {
+      console.error('Error updating client:', error);
+      showToast("שגיאה בעדכון הלקוח: " + error.message, "error");
+    }
+  }
+
+
+  // Check if logged in
+  if (localStorage.getItem('isLoggedIn') !== 'true') {
+    window.location.href = 'login.html';
+  }
+
+  function logout() {
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('savedUsername');
+    localStorage.removeItem('savedPassword');
+    window.location.href = 'login.html';
+  }
+
+  loadClients();
+</script>
+</body>
+</html>
