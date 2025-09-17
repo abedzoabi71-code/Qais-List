@@ -1,0 +1,1417 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>מפגשים ללקוח</title>
+  <style>
+    :root{
+      --bg:#f7f9fc; --fg:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+      --card:#ffffff; --header:#f8fafc; --accent:#3b82f6; --danger:#dc2626;
+      --select-bg: #f3f4f6; --select-fg: #4b5563;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto}
+    .wrap{max-width:1300px;margin:16px auto;padding:0 12px}
+    .top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .back{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px;padding:8px 12px;cursor:pointer}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+    .client-header{background:var(--header);padding:12px 16px;font-size:18px;font-weight:700;color:var(--fg);text-align:right}
+    .client{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px;border-bottom:1px solid var(--line)}
+    .field{background:var(--header);border:1px solid var(--line);border-radius:10px;padding:8px}
+    .label{font-size:11px;color:var(--muted)}
+    .value{margin-top:4px;font-weight:600;font-size:14px}
+    .value input {width: 100%; background: transparent; border: none; outline: none; font-weight: 600; font-size: 14px; color: var(--fg);}
+    .field:nth-child(3) .value input{text-align:right;direction:ltr} /* Phone field alignment */
+    .toolbar{display:flex;gap:6px;align-items:center;padding:8px;border-bottom:1px solid var(--line)}
+    .btn{border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px;padding:7px 10px;cursor:pointer}
+    .btn.primary{background:var(--accent);color:#fff;border-color:transparent}
+    .search{margin-inline-start:auto;display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;padding:5px 8px;background:var(--header);min-width:200px}
+    .search input{background:transparent;border:0;outline:0;color:var(--fg);flex:1}
+    .table-wrap{overflow:visible;border-radius:12px;overflow:hidden;border:1px solid var(--line);border-top:none}
+    table{width:100%;border-collapse:collapse;border-spacing:0;table-layout:auto}
+    thead th{position:sticky;top:0;background:var(--header);z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;padding:10px 8px;border-bottom:1px solid var(--line);text-align:right}
+    tbody td{padding:10px 8px;text-align:right;vertical-align:top;white-space:normal;word-break:break-word}
+    tbody tr{border-bottom:1px solid var(--line)}
+    tbody tr:nth-child(even){background:#f9fbff}
+    thead th:not(:first-child), tbody td:not(:first-child){border-inline-start:1px solid var(--line)}
+    /* Limit overly long text in info column (now 2nd); show up to 2 lines */
+    #sessions td:nth-child(2){
+      overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;white-space:normal
+    }
+    /* Make only selected columns hug content */
+    #sessions col.shrink{ width:1% }
+    #sessions th:nth-child(1), #sessions td:nth-child(1),
+    #sessions th:nth-child(4), #sessions td:nth-child(4),
+    #sessions th:nth-child(5), #sessions td:nth-child(5),
+    #sessions th:nth-child(6), #sessions td:nth-child(6),
+    #sessions th:nth-child(7), #sessions td:nth-child(7),
+    #sessions th:nth-child(8), #sessions td:nth-child(8){ white-space:nowrap }
+    tbody tr:hover{background:#f9fbff}
+    td.num,th.num{text-align:right}
+    /* column classes reserved for future tweaks */
+    td.num, th.num{white-space:nowrap;font-variant-numeric:tabular-nums}
+    .iconbtn{border:1px solid var(--line);background:#fff;color:#111827;border-radius:8px;padding:6px 8px;cursor:pointer}
+    .iconbtn.danger{border-color:#fecaca;background:#fff1f2;color:#991b1b}
+    .modal{position:fixed;inset:0;background:rgba(2,6,23,.35);display:flex;align-items:center;justify-content:center;z-index:9999}
+    .modal.hidden{display:none}
+    .modal .panel{width:min(700px,94vw);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;position:relative;z-index:10000}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .grid .col-2{grid-column:span 2}
+    .grid .col-3{grid-column:span 3}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+    input,select,textarea{width:100%;background:#fff;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:8px;outline:none}
+    textarea{resize:vertical;min-height:42px}
+    .panel .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    
+    /* Custom multi-select styles */
+    .multiselect-container {
+      position: relative;
+      min-height: 42px;
+    }
+    .multiselect-input {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      min-height: 42px;
+      align-items: center;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+    }
+    .multiselect-tag {
+      display: flex;
+      align-items: center;
+      background: var(--select-bg);
+      color: var(--select-fg);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .multiselect-tag-remove {
+      margin-right: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .multiselect-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-top: 4px;
+      padding: 8px;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      max-height: 200px;
+      overflow-y: auto;
+      display: none;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+    .multiselect-dropdown.show {
+      display: block;
+    }
+    .multiselect-option {
+      padding: 8px;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .multiselect-option:hover {
+      background: var(--header);
+    }
+    .multiselect-option.selected {
+      background: var(--select-bg);
+      color: var(--select-fg);
+    }
+    .multiselect-placeholder {
+      color: var(--muted);
+      padding: 0 4px;
+    }
+    
+    /* Error message styling */
+    .error-message {
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 10px 0;
+      border: 1px solid #fecaca;
+      display: none;
+    }
+    
+    .success-message {
+      background: #dcfce7;
+      color: #166534;
+      padding: 12px;
+      border-radius: 8px;
+      margin: 10px 0;
+      border: 1px solid #bbf7d0;
+      display: none;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    /* Mobile card layout */
+    .treatments-cards-container {
+      display: none;
+      gap: 12px;
+    }
+    
+    .treatment-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .treatment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .treatment-info {
+      flex: 1;
+      margin-left: 12px;
+    }
+    
+    .treatment-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--fg);
+      margin: 0 0 4px 0;
+      line-height: 1.3;
+    }
+    
+    .treatment-meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    
+    .treatment-actions {
+      flex-shrink: 0;
+    }
+    
+    .treatment-data {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .treatment-data-item {
+      text-align: center;
+    }
+    
+    .treatment-data-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    
+    .treatment-data-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    
+    .treatment-details {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+    
+    .treatment-areas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 100%;
+    }
+    
+    .treatment-area {
+      background: var(--header);
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      border: 1px solid var(--line);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    
+    .treatment-actions {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .card-btn {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .card-btn.edit {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: #3730a3;
+    }
+    
+    .card-btn.delete {
+      background: #fff1f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+    
+    .card-btn:hover {
+      opacity: 0.8;
+    }
+    
+    /* Hide mobile elements on desktop */
+    .mobile-client-card{
+      display:none;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+      .wrap{padding:0 12px;margin:12px auto}
+      
+      /* Hide table, show cards */
+      .table-wrap{display:none}
+      .treatments-cards-container{display:block}
+      
+      /* Hide desktop client card on mobile */
+      #clientCard{display:none}
+      
+      /* Show mobile elements on mobile */
+      .mobile-client-header,
+      .mobile-client-card{
+        display:block;
+      }
+      
+      /* Mobile client header (name inside card) */
+      .mobile-client-header{
+        background:var(--header);
+        padding:12px 16px;
+        font-size:18px;
+        font-weight:700;
+        color:var(--fg);
+        text-align:right;
+        display:block;
+      }
+      
+      /* Mobile client card */
+      .mobile-client-card{
+        background:var(--card);
+        border:1px solid var(--line);
+        border-radius:12px;
+        overflow:hidden;
+        margin-bottom:12px;
+        padding:16px;
+      }
+      
+      /* Mobile client grid - 2 per row */
+      .mobile-client-grid{
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:12px;
+        margin-bottom:16px;
+      }
+      
+      /* Mobile client items */
+      .mobile-client-item{
+        background:#f8f9fa;
+        border-radius:8px;
+        padding:12px;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-direction:row-reverse;
+      }
+      
+      .mobile-client-content{
+        flex:1;
+      }
+      
+      .mobile-client-label{
+        font-size:11px;
+        color:var(--muted);
+        margin-bottom:4px;
+        text-align:right;
+      }
+      
+      .mobile-client-value{
+        font-size:14px;
+        font-weight:600;
+        color:var(--fg);
+        text-align:right;
+      }
+      
+      .mobile-client-value input{
+        width:100%;
+        border:none;
+        background:transparent;
+        font-size:14px;
+        font-weight:600;
+        color:var(--fg);
+        text-align:right;
+        padding:0;
+      }
+      
+      .mobile-client-value input:focus{
+        background:#fff;
+        outline:1px solid var(--accent);
+        border-radius:4px;
+        padding:2px 4px;
+      }
+      
+      .mobile-client-icon{
+        width:24px;
+        height:24px;
+        background:#e5e7eb;
+        border-radius:6px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:12px;
+        color:var(--muted);
+        flex-shrink:0;
+      }
+      
+      /* Mobile financial grid - card style like treatment cards */
+      .mobile-financial-grid{
+        display:grid;
+        grid-template-columns:repeat(3,1fr);
+        gap:12px;
+        padding:12px 0;
+        border-top:1px solid #f0f0f0;
+      }
+      
+      .mobile-financial-item{
+        text-align:center;
+      }
+      
+      .mobile-financial-label{
+        font-size:10px;
+        color:var(--muted);
+        margin-bottom:4px;
+      }
+      
+      .mobile-financial-value{
+        font-size:14px;
+        font-weight:700;
+        color:var(--fg);
+      }
+      
+    
+      
+      /* Mobile toolbar */
+      .toolbar{
+        display:flex;
+        flex-direction:column;
+        gap:12px;
+        align-items:stretch
+      }
+      
+      .search{
+        width:100%;
+        max-width:none;
+        flex:none;
+        order:1
+      }
+      
+      .btn.primary{
+        flex-shrink:0;
+        white-space:nowrap;
+        padding:8px 12px;
+        font-size:14px;
+        order:2;
+        align-self:flex-end;
+        margin-left:auto;
+        display:inline-block
+      }
+      
+      .top{flex-direction:row;gap:8px;align-items:center;flex-wrap:wrap}
+      .back{flex-shrink:0;white-space:nowrap}
+      .modal .panel{width:95vw;padding:12px}
+      .grid{grid-template-columns:1fr;gap:8px}
+      .grid .col-2,.grid .col-3{grid-column:span 1}
+      
+      /* Mobile dropdown improvements */
+      .multiselect-dropdown {
+        max-height: 150px;
+        position: fixed;
+        top: auto;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        width: auto;
+        z-index: 10001;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+      
+      .multiselect-option {
+        padding: 12px;
+        font-size: 16px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+      }
+      
+      /* Mobile treatment areas */
+      .treatment-areas {
+        gap: 4px;
+      }
+      
+      .treatment-area {
+        font-size: 10px;
+        padding: 3px 6px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .top{flex-direction:column;gap:8px;align-items:stretch}
+      .back{width:auto;align-self:flex-start}
+      .client{grid-template-columns:repeat(2,1fr);gap:3px;padding:4px}
+      .field{padding:3px;font-size:11px}
+      .field .label{font-size:9px}
+      .field .value{font-size:10px}
+      .toolbar{flex-direction:column;gap:8px;align-items:stretch}
+      .search{margin-inline-start:0;max-width:none}
+      .table{font-size:12px}
+      thead th,tbody td{padding:6px 4px}
+      .btn{padding:8px 12px;font-size:14px;width:auto}
+      .search input{font-size:16px} /* Prevents zoom on iOS */
+      .modal .panel{padding:10px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <button class="back" onclick="location.href='clients list.html'">❮ חזרה</button>
+    </div>
+
+    <div class="error-message" id="errorMessage"></div>
+    <div class="success-message" id="successMessage"></div>
+
+    <!-- Desktop client card -->
+    <div class="card" id="clientCard">
+      <div class="client-header" id="desktopClientName">דנה כהן</div>
+      <div class="client">
+        <div class="field"><div class="label">שם לקוח</div><div class="value"><input type="text" id="cName" value="—" onchange="updateClientField('שם לקוח', this.value)"></div></div>
+        <div class="field"><div class="label">מסי לקוח</div><div class="value" id="cNo">—</div></div>
+        <div class="field"><div class="label">טלפון</div><div class="value"><input type="text" id="cPhone" value="—" dir="ltr" onchange="updateClientField('טלפון', this.value)"></div></div>
+        <div class="field"><div class="label">עיר</div><div class="value"><input type="text" id="cCity" value="—" onchange="updateClientField('עיר', this.value)"></div></div>
+        <div class="field"><div class="label">סה״כ לתשלום</div><div class="value" id="sumTotal">₪ 0</div></div>
+        <div class="field"><div class="label">תקבולים</div><div class="value" id="sumPaid">₪ 0</div></div>
+        <div class="field"><div class="label">יתרה</div><div class="value" id="sumBalance">₪ 0</div></div>
+        <div class="field"><div class="label">ת״ז / כתובת</div><div class="value"><input type="text" id="cMeta" value="—" onchange="updateClientMeta(this.value)"></div></div>
+      </div>
+    </div>
+
+    <!-- Mobile client layout -->
+    <div class="mobile-client-card">
+      <div class="mobile-client-header" id="mobileClientName">דנה כהן</div>
+      <div class="mobile-client-grid">
+        <div class="mobile-client-item">
+          <div class="mobile-client-content">
+            <div class="mobile-client-label">מס לקוח</div>
+            <div class="mobile-client-value" id="mobileCNo">10021</div>
+          </div>
+          <div class="mobile-client-icon">#</div>
+        </div>
+        <div class="mobile-client-item">
+          <div class="mobile-client-content">
+            <div class="mobile-client-label">טלפון</div>
+            <div class="mobile-client-value"><input type="text" id="mobileCPhone" value="050-123-4567" dir="ltr" onchange="updateClientField('טלפון', this.value)"></div>
+          </div>
+          <div class="mobile-client-icon">📞</div>
+        </div>
+        <div class="mobile-client-item">
+          <div class="mobile-client-content">
+            <div class="mobile-client-label">עיר</div>
+            <div class="mobile-client-value"><input type="text" id="mobileCCity" value="תל אביב-יפו" onchange="updateClientField('עיר', this.value)"></div>
+          </div>
+          <div class="mobile-client-icon">🏢</div>
+        </div>
+        <div class="mobile-client-item">
+          <div class="mobile-client-content">
+            <div class="mobile-client-label">יישוב / כתובת</div>
+            <div class="mobile-client-value"><input type="text" id="mobileCMeta" value="דיזנגוף 123, תל אביב" onchange="updateClientMeta(this.value)"></div>
+          </div>
+          <div class="mobile-client-icon">📍</div>
+        </div>
+      </div>
+      <div class="mobile-financial-grid">
+        <div class="mobile-financial-item">
+          <div class="mobile-financial-label">סה״כ לתשלום</div>
+          <div class="mobile-financial-value" id="mobileSumTotal">₪ 0</div>
+        </div>
+        <div class="mobile-financial-item">
+          <div class="mobile-financial-label">תקבולים</div>
+          <div class="mobile-financial-value" id="mobileSumPaid">₪ 0</div>
+        </div>
+        <div class="mobile-financial-item">
+          <div class="mobile-financial-label">יתרה</div>
+          <div class="mobile-financial-value" id="mobileSumBalance">₪ 0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn primary" id="addBtn">+ הוסף טיפול</button>
+      <div class="search"><input id="q" placeholder="חיפוש בשורות…" oninput="filterRows()"></div>
+    </div>
+
+    <div class="table-wrap">
+      <table id="sessions">
+        <colgroup>
+          <col class="col-action shrink">
+          <col class="col-info" style="width:25%">
+          <col class="col-area" style="width:20%">
+          <col class="col-date shrink">
+          <col class="col-money shrink">
+          <col class="col-money shrink">
+          <col class="col-money shrink">
+          <col class="col-paytype shrink">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>פעולה</th>
+            <th>מידע על הטיפול</th>
+            <th>אזור טיפול</th>
+            <th>תאריך</th>
+            <th class="num">סכום לתשלום</th>
+            <th class="num">שולם על חשבון</th>
+            <th>יתרה</th>
+            <th>אופן תשלום</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Example row for layout preview -->
+          <tr>
+            <td>
+              <button class="iconbtn" title="עריכה" onclick="editTreatment('example')" style="margin-left: 4px;">✏️</button>
+              <button class="iconbtn danger" title="מחק" onclick="del('example')">🗑</button>
+            </td>
+            <td>טיפול שגרתי להקלה על כאבי גב תחתון עם תיאור ארוך לדוגמה שמדגים חיתוך טקסט אחרי שתי שורות</td>
+            <td>גב, כתפיים</td>
+            <td>07/09/25</td>
+            <td class="num">₪350</td>
+            <td class="num">₪200</td>
+            <td class="num">₪150</td>
+            <td>מזומן</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile Treatments Cards Container - Outside of the client card -->
+    <div class="treatments-cards-container" id="treatmentsCardsContainer">
+      <!-- Example card for preview -->
+      <div class="treatment-card">
+        <div class="treatment-header">
+          <div class="treatment-info">
+            <h3 class="treatment-title">טיפול שגרתי להקלה על כאבי גב תחתון</h3>
+            <div class="treatment-meta">
+              <span>📅 07/09/25</span>
+              <span>💳 מזומן</span>
+            </div>
+          </div>
+        </div>
+        <div class="treatment-data">
+          <div class="treatment-data-item">
+            <div class="treatment-data-label">סכום לתשלום</div>
+            <div class="treatment-data-value">₪ 350</div>
+          </div>
+          <div class="treatment-data-item">
+            <div class="treatment-data-label">שולם על חשבון</div>
+            <div class="treatment-data-value">₪ 200</div>
+          </div>
+          <div class="treatment-data-item">
+            <div class="treatment-data-label">יתרה</div>
+            <div class="treatment-data-value">₪ 150</div>
+          </div>
+        </div>
+        <div class="treatment-details">
+          <div class="treatment-areas">
+            <span class="treatment-area">גב</span>
+            <span class="treatment-area">כתפיים</span>
+          </div>
+          <div class="treatment-actions">
+            <button class="card-btn edit" onclick="editTreatment('example')">עריכה</button>
+            <button class="card-btn delete" onclick="del('example')">מחיקה</button>
+          </div>
+        </div>
+      </div>
+      <!-- Cards will be dynamically generated here -->
+    </div>
+  </div>
+
+  <!-- Add Treatment Modal -->
+  <div class="modal hidden" id="modal">
+    <div class="panel">
+      <h2 style="margin:0 0 10px">הוספת טיפול</h2>
+      <div class="grid">
+        <div class="col-3">
+          <label>מידע על הטיפול</label>
+          <textarea id="f_info" placeholder="תיאור קצר"></textarea>
+        </div>
+        <div>
+          <label>תאריך</label>
+          <input id="f_date" type="date">
+        </div>
+        <div>
+          <label>סה"כ לתשלום (₪)</label>
+          <input id="f_due" type="number" min="0" step="0.5" placeholder="0">
+        </div>
+        <div>
+          <label>שולם על חשבון (₪)</label>
+          <input id="f_paid" type="number" min="0" step="0.5" placeholder="0">
+        </div>
+        <div>
+          <label>אופן תשלום</label>
+          <select id="f_paytype">
+            <option value="">—</option>
+            <option>מזומן</option><option>אשראי</option><option>העברה</option><option>אחר</option>
+          </select>
+        </div>
+        <div class="col-3">
+          <label>אזור טיפול</label>
+          <div class="multiselect-container" id="areaMultiselect">
+            <div class="multiselect-input" onclick="toggleAreaDropdown()">
+              <div id="selectedAreas" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+              <div class="multiselect-placeholder" id="areaPlaceholder">בחר אזור</div>
+            </div>
+            <div class="multiselect-dropdown" id="areaDropdown">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="cancel">ביטול</button>
+        <button class="btn primary" id="save">שמור</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/pocketbase/dist/pocketbase.umd.js"></script>
+  <script>
+    const { createClient } = window.supabase;
+    const USE_POCKETBASE = false; // set to true to use PocketBase backend
+    const supabase = createClient(
+      "https://bneeivzzmfcslhwneccr.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuZWVpdnp6bWZjc2xod25lY2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNzMxMjcsImV4cCI6MjA3MTk0OTEyN30.7ojWOfMyaGDwBRt2qcl3sVoAaI5Dwn1wLXuhCxD6hpo"
+    );
+    const pb = new window.PocketBase('http://127.0.0.1:8090');
+
+    const tbody = document.querySelector('#sessions tbody');
+    const modal = document.getElementById('modal');
+    const addBtn = document.getElementById('addBtn');
+    const cancelBtn = document.getElementById('cancel');
+    const saveBtn = document.getElementById('save');
+    const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    
+    // Column name constants - UPDATE THESE TO MATCH YOUR SUPABASE TABLE
+    const DUE_COL = 'סכום לתשלום';
+    const PAID_COL = 'שולם על חשבון';
+    const INFO_COL = 'מידע על הטיפול';
+    const AREA_COL = 'אזור טיפול';
+    const DATE_COL = 'תאריך';
+    const PAYTYPE_COL = 'אופן תשלום';
+    const CLIENT_COL = 'לקוח';
+    // Using Hebrew schema only
+    
+    // Multi-select variables
+    const selectedAreas = [];
+    const areaDropdown = document.getElementById('areaDropdown');
+    const selectedAreasContainer = document.getElementById('selectedAreas');
+    const areaPlaceholder = document.getElementById('areaPlaceholder');
+    const AREA_OPTIONS = [
+      'פנים','גב','רגליים','ידיים','בית שחי','צוואר','כתפיים','חזה','בטן','אגן','ישבן','ירכיים','ברכיים','שוקיים','קרסוליים','כפות רגליים','מפשעה','אמה','מרפק','כף יד','אצבעות','קרקפת','אוזניים','עיניים','אף','פה','לסת','גב תחתון','גב עליון','מותן','אחר'
+    ];
+
+    function renderAreaOptions(){
+      areaDropdown.innerHTML = AREA_OPTIONS.map(opt =>
+        `<div class="multiselect-option" onclick="toggleArea('${opt}')">${opt}</div>`
+      ).join('');
+    }
+
+    function fmt(n){ return Number(n||0).toLocaleString('he-IL'); }
+    function todayISO(){
+      const d = new Date();
+      const p = n => String(n).padStart(2,'0');
+      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+    }
+    function qs(p){ return (new URLSearchParams(location.search)).get(p); }
+    function clientId(){ return Number(qs('id')||0); }
+
+    // Error handling function
+    function showError(message) {
+      errorMessage.textContent = message;
+      errorMessage.style.display = 'block';
+      setTimeout(() => {
+        errorMessage.style.display = 'none';
+      }, 10000);
+    }
+    
+    // Success handling function
+    function showSuccess(message) {
+      successMessage.textContent = message;
+      successMessage.style.display = 'block';
+      setTimeout(() => {
+        successMessage.style.display = 'none';
+      }, 5000);
+    }
+
+    // Multi-select functions
+    function toggleAreaDropdown() {
+      const isMobile = window.innerWidth <= 768;
+      areaDropdown.classList.toggle('show');
+      
+      if (isMobile && areaDropdown.classList.contains('show')) {
+        // On mobile, position dropdown at bottom of screen for better scrolling
+        const rect = areaDropdown.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const dropdownHeight = Math.min(200, viewportHeight * 0.4);
+        
+        areaDropdown.style.maxHeight = dropdownHeight + 'px';
+        areaDropdown.style.position = 'fixed';
+        areaDropdown.style.bottom = '20px';
+        areaDropdown.style.left = '20px';
+        areaDropdown.style.right = '20px';
+        areaDropdown.style.top = 'auto';
+        areaDropdown.style.zIndex = '10001';
+      } else if (!isMobile) {
+        // Reset to normal positioning on desktop
+        areaDropdown.style.position = 'absolute';
+        areaDropdown.style.top = '100%';
+        areaDropdown.style.bottom = 'auto';
+        areaDropdown.style.left = '0';
+        areaDropdown.style.right = '0';
+        areaDropdown.style.maxHeight = '200px';
+        areaDropdown.style.zIndex = '100';
+      }
+    }
+    
+    function toggleArea(area) {
+      const index = selectedAreas.indexOf(area);
+      
+      if (index === -1) {
+        selectedAreas.push(area);
+      } else {
+        selectedAreas.splice(index, 1);
+      }
+      
+      updateSelectedAreasDisplay();
+      
+      // Update options in dropdown to show selected state
+      const options = areaDropdown.querySelectorAll('.multiselect-option');
+      options.forEach(option => {
+        if (option.textContent === area) {
+          option.classList.toggle('selected', selectedAreas.includes(area));
+        }
+      });
+      
+      // REMOVED: areaDropdown.classList.remove('show');
+    }
+    
+    function removeArea(area, event) {
+      event.stopPropagation();
+      const index = selectedAreas.indexOf(area);
+      if (index !== -1) {
+        selectedAreas.splice(index, 1);
+        updateSelectedAreasDisplay();
+        
+        // Update the dropdown option
+        const options = areaDropdown.querySelectorAll('.multiselect-option');
+        options.forEach(option => {
+          if (option.textContent === area) {
+            option.classList.remove('selected');
+          }
+        });
+      }
+    }
+    
+    function updateSelectedAreasDisplay() {
+      selectedAreasContainer.innerHTML = '';
+      
+      if (selectedAreas.length > 0) {
+        areaPlaceholder.classList.add('hidden');
+        
+        selectedAreas.forEach(area => {
+          const tag = document.createElement('div');
+          tag.className = 'multiselect-tag';
+          tag.innerHTML = `
+            <span class="multiselect-tag-remove" onclick="removeArea('${area}', event)">×</span>
+            ${area}
+          `;
+          selectedAreasContainer.appendChild(tag);
+        });
+      } else {
+        areaPlaceholder.classList.remove('hidden');
+      }
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+      if (!event.target.closest('.multiselect-container')) {
+        areaDropdown.classList.remove('show');
+      }
+    });
+
+    // Function to update client field
+    async function updateClientField(field, value) {
+      const id = clientId();
+      try {
+        const { error } = await supabase
+          .from('לקוחות')
+          .update({ [field]: value })
+          .eq('מזהה', id);
+        
+        if (error) throw error;
+        
+        // Update header if name field is being updated
+        if (field === 'שם לקוח') {
+          document.getElementById('desktopClientName').textContent = value || '—';
+          document.getElementById('mobileClientName').textContent = value || '—';
+        }
+        
+        showSuccess('פרטי הלקוח עודכנו בהצלחה');
+      } catch (error) {
+        console.error('Error updating client:', error);
+        showError('שגיאה בעדכון הלקוח: ' + error.message);
+      }
+    }
+
+    // Function to update client meta (ID and address)
+    async function updateClientMeta(value) {
+      const id = clientId();
+      try {
+        // Assuming the value contains both ID and address separated by " · "
+        const parts = value.split(' · ');
+        const updateData = {};
+        
+        if (parts.length > 0) updateData['תעודת זהות'] = parts[0];
+        if (parts.length > 1) updateData['כתובת'] = parts[1];
+        
+        const { error } = await supabase
+          .from('לקוחות')
+          .update(updateData)
+          .eq('מזהה', id);
+        
+        if (error) throw error;
+        showSuccess('פרטי הלקוח עודכנו בהצלחה');
+      } catch (error) {
+        console.error('Error updating client meta:', error);
+        showError('שגיאה בעדכון פרטי הלקוח: ' + error.message);
+      }
+    }
+
+    async function pbLoadClient(){
+      const id = qs('id'); if(!id) return;
+      try {
+        const c = await pb.collection('clients').getOne(id);
+        document.getElementById('desktopClientName').textContent = c.name || '—';
+        document.getElementById('cName').value = c.name || '—';
+        document.getElementById('cNo').value = c.number || '—';
+        document.getElementById('cPhone').value = c.phone || '—';
+        const idPart = c.id_number || '';
+        const addressPart = c.address || '';
+        document.getElementById('cMeta').value = idPart + (addressPart ? ' · ' + addressPart : '');
+        document.getElementById('today').textContent = new Date().toLocaleDateString('he-IL');
+      } catch (error) {
+        console.error('PB load client error:', error);
+        showError('שגיאה בטעינת נתוני הלקוח (PB): ' + (error?.message||error));
+      }
+    }
+
+    async function loadClient(){
+      if (USE_POCKETBASE) return pbLoadClient();
+      const id = clientId(); if(!id) return;
+      try {
+        const { data: c, error } = await supabase.from('לקוחות').select('*').eq('מזהה', id).single();
+        if(error) throw error;
+        if(!c) return;
+        
+        // Desktop elements
+        document.getElementById('desktopClientName').textContent = c['שם לקוח'] || '—';
+        document.getElementById('cName').value = c['שם לקוח'] || '—';
+        document.getElementById('cNo').textContent = c['מזהה'] || '—';
+        document.getElementById('cPhone').value = c['טלפון'] || '—';
+        document.getElementById('cCity').value = c['עיר'] || '—';
+        
+        // Mobile elements
+        document.getElementById('mobileClientName').textContent = c['שם לקוח'] || '—';
+        document.getElementById('mobileCNo').textContent = c['מזהה'] || '—';
+        document.getElementById('mobileCPhone').value = c['טלפון'] || '—';
+        document.getElementById('mobileCCity').value = c['עיר'] || '—';
+        
+        const idPart = c['תעודת זהות'] || '';
+        const addressPart = c['כתובת'] || '';
+        document.getElementById('cMeta').value = idPart + (addressPart ? ' · ' + addressPart : '');
+        document.getElementById('mobileCMeta').value = idPart + (addressPart ? ' · ' + addressPart : '');
+        
+        document.getElementById('today').textContent = new Date().toLocaleDateString('he-IL');
+      } catch (error) {
+        console.error('Error loading client:', error);
+        showError('שגיאה בטעינת נתוני הלקוח: ' + error.message);
+      }
+    }
+
+    async function pbLoadSessions(){
+      const id = qs('id');
+      try {
+        const result = await pb.collection('actions').getList(1, 500, { filter: `client = "${id}"`, sort: '-date,-created' });
+        tbody.innerHTML = '';
+        let total=0, paid=0;
+        (result?.items||[]).forEach(r=>{
+          const due  = Number(r.due || 0);
+          const got  = Number(r.paid|| 0);
+          total += due; paid += got;
+          const bal = due - got;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><button class="iconbtn danger" title="מחק" onclick="del('${r.id}')">🗑</button></td>
+            <td>${r.info||''}</td>
+            <td>${r.area||''}</td>
+            <td>${r.date ? new Date(r.date).toLocaleDateString('he-IL',{year:'2-digit',month:'2-digit',day:'2-digit'}) : ''}</td>
+            <td class="num">₪${fmt(due)}</td>
+            <td class="num">₪${fmt(got)}</td>
+            <td class="num">₪${fmt(bal)}</td>
+            <td>${r.paytype||''}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        // Desktop financial totals
+        document.getElementById('sumTotal').textContent   = '₪ '+fmt(total);
+        document.getElementById('sumPaid').textContent    = '₪ '+fmt(paid);
+        document.getElementById('sumBalance').textContent = '₪ '+fmt(total - paid);
+        
+        // Mobile financial totals
+        document.getElementById('mobileSumTotal').textContent   = '₪ '+fmt(total);
+        document.getElementById('mobileSumPaid').textContent    = '₪ '+fmt(paid);
+        document.getElementById('mobileSumBalance').textContent = '₪ '+fmt(total - paid);
+      } catch (error) {
+        console.error('PB load sessions error:', error);
+        showError('שגיאה בטעינת הטיפולים (PB): ' + (error?.message||error));
+      }
+    }
+
+    async function loadSessions(){
+      if (USE_POCKETBASE) return pbLoadSessions();
+      const id = clientId();
+      try {
+        const { data: acts, error } = await supabase
+          .from('פעולות')
+          .select('*')
+          .eq(CLIENT_COL, id)
+          .order(DATE_COL, { ascending: false })
+          .order('מזהה', { ascending: false });
+        
+        if(error) throw error;
+
+        // Clear table body and cards container before inserting fresh data
+        tbody.innerHTML = '';
+        const cardsContainer = document.querySelector('#treatmentsCardsContainer');
+        if (cardsContainer) {
+          cardsContainer.innerHTML = '';
+        }
+        
+        // Store treatments data globally for editing
+        currentTreatmentsData = acts || [];
+        
+        let total=0, paid=0;
+        (acts||[]).forEach(r=>{
+          const due  = Number(r[DUE_COL] || 0);
+          const got  = Number(r[PAID_COL]|| 0);
+          total += due; paid += got;
+          const bal = due - got;
+          
+          // Table row
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              <button class="iconbtn" title="עריכה" onclick="editTreatment(${r['מזהה']})" style="margin-left: 4px;">✏️</button>
+              <button class="iconbtn danger" title="מחק" onclick="del(${r['מזהה']})">🗑</button>
+            </td>
+            <td>${r[INFO_COL]||''}</td>
+            <td>${r[AREA_COL]||''}</td>
+            <td>${r[DATE_COL] ? new Date(r[DATE_COL]).toLocaleDateString('he-IL',{year:'2-digit',month:'2-digit',day:'2-digit'}) : ''}</td>
+            <td class="num">₪ ${fmt(due)}</td>
+            <td class="num">₪ ${fmt(got)}</td>
+            <td class="num">₪ ${fmt(bal)}</td>
+            <td>${r[PAYTYPE_COL]||''}</td>
+          `;
+          tbody.appendChild(tr);
+          
+          // Treatment card
+          const card = document.createElement('div');
+          card.className = 'treatment-card';
+          card.setAttribute('data-treatment-id', r['מזהה']);
+          
+          const treatmentInfo = r[INFO_COL] || '';
+          const area = r[AREA_COL] || '';
+          const date = r[DATE_COL] ? new Date(r[DATE_COL]).toLocaleDateString('he-IL',{year:'2-digit',month:'2-digit',day:'2-digit'}) : '';
+          const payType = r[PAYTYPE_COL] || '';
+          
+          // Split areas by comma and create individual bubbles
+          const areas = area ? area.split(',').map(a => a.trim()).filter(a => a) : [];
+          const areaBubbles = areas.map(areaName => `<span class="treatment-area">${areaName}</span>`).join('');
+          
+          card.innerHTML = `
+            <div class="treatment-header">
+              <div class="treatment-info">
+                <h3 class="treatment-title">${treatmentInfo}</h3>
+                <div class="treatment-meta">
+                  <span>📅 ${date}</span>
+                  ${payType ? `<span>💳 ${payType}</span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="treatment-data">
+              <div class="treatment-data-item">
+                <div class="treatment-data-label">סכום לתשלום</div>
+                <div class="treatment-data-value">₪ ${fmt(due)}</div>
+              </div>
+              <div class="treatment-data-item">
+                <div class="treatment-data-label">שולם על חשבון</div>
+                <div class="treatment-data-value">₪ ${fmt(got)}</div>
+              </div>
+              <div class="treatment-data-item">
+                <div class="treatment-data-label">יתרה</div>
+                <div class="treatment-data-value">₪ ${fmt(bal)}</div>
+              </div>
+            </div>
+            <div class="treatment-details">
+              <div class="treatment-areas">${areaBubbles}</div>
+              <div class="treatment-actions">
+                <button class="card-btn edit" onclick="editTreatment(${r['מזהה']})">עריכה</button>
+                <button class="card-btn delete" onclick="del(${r['מזהה']})">מחיקה</button>
+              </div>
+            </div>
+          `;
+          if (cardsContainer) {
+            cardsContainer.appendChild(card);
+          }
+        });
+        // Desktop financial totals
+        document.getElementById('sumTotal').textContent   = '₪ '+fmt(total);
+        document.getElementById('sumPaid').textContent    = '₪ '+fmt(paid);
+        document.getElementById('sumBalance').textContent = '₪ '+fmt(total - paid);
+        
+        // Mobile financial totals
+        document.getElementById('mobileSumTotal').textContent   = '₪ '+fmt(total);
+        document.getElementById('mobileSumPaid').textContent    = '₪ '+fmt(paid);
+        document.getElementById('mobileSumBalance').textContent = '₪ '+fmt(total - paid);
+      } catch (error) {
+        console.error('Error loading sessions:', error);
+        showError('שגיאה בטעינת הטיפולים: ' + error.message);
+      }
+    }
+
+    function openModal(){
+      // Reset edit mode
+      currentEditId = null;
+      
+      // Reset modal title and save button
+      document.querySelector('#modal h2').textContent = 'הוספת טיפול';
+      document.getElementById('save').textContent = 'שמור';
+      
+      modal.classList.remove('hidden');
+      document.getElementById('f_info').value = '';
+      
+      // Reset multi-select
+      selectedAreas.length = 0;
+      updateSelectedAreasDisplay();
+      const options = areaDropdown.querySelectorAll('.multiselect-option');
+      options.forEach(option => option.classList.remove('selected'));
+      
+      document.getElementById('f_date').value = todayISO();
+      document.getElementById('f_due').value = '';
+      document.getElementById('f_paid').value = '';
+      document.getElementById('f_paytype').value = '';
+      setTimeout(()=>document.getElementById('f_info').focus(), 0);
+    }
+    function closeModal(){ modal.classList.add('hidden'); }
+    addBtn.addEventListener('click', openModal);
+    cancelBtn.addEventListener('click', closeModal);
+
+    async function pbSave(){
+      const id = qs('id');
+      try {
+        await pb.collection('actions').create({
+          client: id,
+          info: document.getElementById('f_info').value || null,
+          area: selectedAreas.join(', '),
+          date: document.getElementById('f_date').value || todayISO(),
+          due: Number(document.getElementById('f_due').value||0),
+          paid: Number(document.getElementById('f_paid').value||0),
+          paytype: document.getElementById('f_paytype').value || null
+        });
+        closeModal();
+        loadSessions();
+        showSuccess('הטיפול נוסף בהצלחה (PB)');
+      } catch (error) {
+        console.error('PB save error:', error);
+        showError('שגיאה בשמירת הטיפול (PB): ' + (error?.message||error));
+      }
+    }
+
+    async function save(){
+      if (USE_POCKETBASE) return pbSave();
+      const id = clientId();
+      
+      // Check if we're editing or adding
+      if (currentEditId) {
+        // Update existing treatment
+        try {
+          const updateData = {
+            [INFO_COL]: document.getElementById('f_info').value || null,
+            [AREA_COL]: selectedAreas.join(', '),
+            [DATE_COL]: document.getElementById('f_date').value || todayISO(),
+            [DUE_COL]: Number(document.getElementById('f_due').value||0),
+            [PAID_COL]: Number(document.getElementById('f_paid').value||0),
+            [PAYTYPE_COL]: document.getElementById('f_paytype').value || null
+          };
+          
+          // Use RPC function for updating, similar to adding
+          const { data, error } = await supabase.rpc('ui_update_treatment', {
+            p_id: Number(currentEditId),
+            p_info: updateData[INFO_COL],
+            p_area: updateData[AREA_COL],
+            p_date: updateData[DATE_COL],
+            p_due: updateData[DUE_COL],
+            p_paid: updateData[PAID_COL],
+            p_paytype: updateData[PAYTYPE_COL]
+          });
+          
+          if (error) {
+            console.error('Supabase update error:', error);
+            throw error;
+          }
+          
+          showSuccess('הטיפול עודכן בהצלחה');
+          
+          closeModal();
+          // Force refresh the data
+          await loadSessions();
+          currentEditId = null;
+        } catch (error) {
+          console.error('Error updating treatment:', error);
+          showError('שגיאה בעדכון הטיפול: ' + error.message);
+          closeModal();
+          currentEditId = null;
+        }
+      } else {
+        // Add new treatment
+        const args = {
+          p_client: id,
+          p_info: document.getElementById('f_info').value || null,
+          p_area: selectedAreas.join(', '), // Join selected areas with comma
+          p_date: document.getElementById('f_date').value || todayISO(),
+          p_due: Number(document.getElementById('f_due').value||0),
+          p_paid: Number(document.getElementById('f_paid').value||0),
+          p_paytype: document.getElementById('f_paytype').value || null
+        };
+        
+        try {
+          // Use a uniquely named RPC function that does not require "סוג רשומה"
+          const { error: rpcError } = await supabase.rpc('ui_insert_treatment_simple', args);
+          if (rpcError) throw rpcError;
+          
+          closeModal();
+          loadSessions();
+          showSuccess('הטיפול נוסף בהצלחה');
+        } catch (error) {
+          console.error('Error saving treatment:', error);
+          
+          // Handle foreign key constraint error specifically
+          if (error.message && error.message.includes('violates foreign key constraint')) {
+            showError('שגיאה: לא ניתן להוסיף טיפול כרגע. ייתכן שיש בעיה בהגדרות המערכת. נסה שוב מאוחר יותר או פנה לתמיכה.');
+          } else {
+            showError('שגיאה בשמירת הטיפול: ' + error.message);
+          }
+        }
+      }
+    }
+    saveBtn.addEventListener('click', save);
+
+    async function pbDel(id){
+      try {
+        await pb.collection('actions').delete(id);
+        loadSessions();
+        showSuccess('הטיפול נמחק בהצלחה (PB)');
+      } catch (error) {
+        console.error('PB delete error:', error);
+        showError('שגיאה במחיקת הטיפול (PB): ' + (error?.message||error));
+      }
+    }
+
+    async function del(id){
+      if (USE_POCKETBASE) return pbDel(id);
+      if(!confirm('למחוק טיפול זה?')) return;
+      try {
+        const { error } = await supabase.from('פעולות').delete().eq('מזהה', id);
+        if(error) throw error;
+        loadSessions();
+        showSuccess('הטיפול נמחק בהצלחה');
+      } catch (error) {
+        console.error('Error deleting treatment:', error);
+        showError('שגיאה במחיקת הטיפול: ' + error.message);
+      }
+    }
+
+    function filterRows(){
+      const q = (document.getElementById('q').value||'').toLowerCase();
+      
+      // Filter table rows
+      document.querySelectorAll('#sessions tbody tr').forEach(tr=>{
+        tr.style.display = tr.innerText.toLowerCase().includes(q) ? '' : 'none';
+      });
+      
+      // Filter treatment cards
+      document.querySelectorAll('.treatment-card').forEach(card=>{
+        const cardText = card.textContent.toLowerCase();
+        const found = cardText.includes(q);
+        card.style.display = found ? '' : 'none';
+      });
+    }
+
+    // Edit treatment function
+    let currentEditId = null;
+    
+    function editTreatment(id) {
+      currentEditId = id;
+      
+      // Find the treatment data from the current sessions
+      const treatments = getCurrentTreatments();
+      const treatment = treatments.find(t => t['מזהה'] == id || t['מזהה'] == Number(id));
+      
+      // For example/demo purposes, create a mock treatment if not found
+      if (!treatment && id === 'example') {
+        const mockTreatment = {
+          'מזהה': 'example',
+          [INFO_COL]: 'טיפול שגרתי להקלה על כאבי גב תחתון עם תיאור ארוך לדוגמה שמדגים חיתוך טקסט אחרי שתי שורות',
+          [AREA_COL]: 'גב, כתפיים',
+          [DATE_COL]: '2025-09-07',
+          [DUE_COL]: 350,
+          [PAID_COL]: 200,
+          [PAYTYPE_COL]: 'מזומן'
+        };
+        
+        // Fill the modal with mock data
+        document.getElementById('f_info').value = mockTreatment[INFO_COL] || '';
+        document.getElementById('f_date').value = mockTreatment[DATE_COL] || todayISO();
+        document.getElementById('f_due').value = mockTreatment[DUE_COL] || '';
+        document.getElementById('f_paid').value = mockTreatment[PAID_COL] || '';
+        document.getElementById('f_paytype').value = mockTreatment[PAYTYPE_COL] || '';
+        
+        // Handle areas - split comma-separated values
+        selectedAreas.length = 0;
+        if (mockTreatment[AREA_COL]) {
+          const areas = mockTreatment[AREA_COL].split(',').map(a => a.trim()).filter(a => a);
+          selectedAreas.push(...areas);
+        }
+        updateSelectedAreasDisplay();
+        
+        // Update options in dropdown
+        const options = areaDropdown.querySelectorAll('.multiselect-option');
+        options.forEach(option => {
+          option.classList.toggle('selected', selectedAreas.includes(option.textContent));
+        });
+        
+        // Change modal title and save button
+        document.querySelector('#modal h2').textContent = 'עריכת טיפול (דוגמה)';
+        document.getElementById('save').textContent = 'עדכן';
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        setTimeout(() => document.getElementById('f_info').focus(), 0);
+        return;
+      }
+      
+      if (!treatment) {
+        showError('לא ניתן למצוא את הטיפול לעריכה');
+        return;
+      }
+      
+      // Fill the modal with existing data
+      document.getElementById('f_info').value = treatment[INFO_COL] || '';
+      document.getElementById('f_date').value = treatment[DATE_COL] || todayISO();
+      document.getElementById('f_due').value = treatment[DUE_COL] || '';
+      document.getElementById('f_paid').value = treatment[PAID_COL] || '';
+      document.getElementById('f_paytype').value = treatment[PAYTYPE_COL] || '';
+      
+      // Handle areas - split comma-separated values
+      selectedAreas.length = 0;
+      if (treatment[AREA_COL]) {
+        const areas = treatment[AREA_COL].split(',').map(a => a.trim()).filter(a => a);
+        selectedAreas.push(...areas);
+      }
+      updateSelectedAreasDisplay();
+      
+      // Update options in dropdown
+      const options = areaDropdown.querySelectorAll('.multiselect-option');
+      options.forEach(option => {
+        option.classList.toggle('selected', selectedAreas.includes(option.textContent));
+      });
+      
+      // Change modal title and save button
+      document.querySelector('#modal h2').textContent = 'עריכת טיפול';
+      document.getElementById('save').textContent = 'עדכן';
+      
+      // Show modal
+      modal.classList.remove('hidden');
+      setTimeout(() => document.getElementById('f_info').focus(), 0);
+    }
+    
+    // Store treatments data globally for editing
+    let currentTreatmentsData = [];
+    
+    function getCurrentTreatments() {
+      return currentTreatmentsData;
+    }
+
+    // Check if logged in
+    if (localStorage.getItem('isLoggedIn') !== 'true') {
+      window.location.href = 'login.html';
+    }
+
+    (async function init(){
+      renderAreaOptions();
+      const id = USE_POCKETBASE ? qs('id') : clientId();
+      if(!id){ showError('חסר מזהה לקוח בכתובת (id=...)'); return; }
+      await loadClient();
+      await loadSessions();
+    })();
+  </script>
+
+  <!-- SQL for RPC ui_insert_treatment moved to documentation to reduce size -->
+</body>
+</html>
