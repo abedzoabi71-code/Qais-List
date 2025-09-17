@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>כניסה למערכת</title>
+  <style>
+    :root{--bg:#f7f9fc;--fg:#1f2937;--muted:#6b7280;--line:#e5e7eb;--card:#ffffff;--accent:#3b82f6;--danger:#dc2626;}
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--fg);
+      font:15px/1.5 system-ui;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:100vh;
+      height:100vh;
+      overflow:hidden;
+      direction:rtl;
+      padding:20px;
+    }
+    .login-container{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:30px;
+      width:100%;
+      max-width:400px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.1);
+      max-height:calc(100vh - 40px);
+      overflow-y:auto;
+    }
+    .login-header{text-align:center;margin-bottom:25px}
+    .login-header h1{margin:0;color:var(--fg);font-size:24px;font-weight:600}
+    .login-header p{margin:8px 0 0;color:var(--muted);font-size:14px}
+    .form-group{margin-bottom:20px;position:relative}
+    .form-group label{display:block;margin-bottom:6px;font-weight:500;color:var(--fg)}
+    .form-group input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;font-size:15px;outline:none;transition:border-color 0.2s}
+    .form-group input:focus{border-color:var(--accent)}
+    .password-container{position:relative}
+    .password-toggle{
+      position:absolute;
+      left:12px;
+      top:50%;
+      transform:translateY(-50%);
+      background:none;
+      border:none;
+      cursor:pointer;
+      color:var(--muted);
+      font-size:18px;
+      padding:0;
+      width:24px;
+      height:24px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:color 0.2s;
+    }
+    .password-toggle:hover{color:var(--fg)}
+    .password-container input{padding-left:45px}
+    .checkbox-group{display:flex;align-items:center;gap:8px;margin-bottom:20px}
+    .checkbox-group input[type="checkbox"]{width:auto;margin:0}
+    .checkbox-group label{margin:0;font-size:14px;color:var(--muted)}
+    .login-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;transition:background-color 0.2s}
+    .login-btn:hover{background:#2563eb}
+    .login-btn:disabled{background:var(--muted);cursor:not-allowed}
+    .error-message{background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;margin-bottom:20px;border:1px solid #fecaca;display:none}
+    .loading{display:inline-block;width:16px;height:16px;border:2px solid #f3f3f3;border-top:2px solid var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin-left:8px}
+    @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      body{padding:16px}
+      .login-container{
+        padding:24px;
+        max-height:calc(100vh - 32px);
+      }
+      .login-header h1{font-size:22px}
+      .form-group input{font-size:16px;padding:14px}
+      .password-container input{padding-left:50px}
+      .password-toggle{left:14px;font-size:20px}
+      .login-btn{padding:14px;font-size:16px}
+    }
+    
+    @media (max-width: 480px) {
+      body{padding:12px}
+      .login-container{
+        padding:20px;
+        max-height:calc(100vh - 24px);
+      }
+      .login-header h1{font-size:20px}
+      .login-header p{font-size:13px}
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>כניסה למערכת</h1>
+      <p>הזן פרטי התחברות</p>
+    </div>
+    
+    <div class="error-message" id="errorMessage"></div>
+    
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="username">שם משתמש</label>
+        <input type="text" id="username" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="password">סיסמה</label>
+        <div class="password-container">
+          <input type="password" id="password" required>
+          <button type="button" class="password-toggle" id="passwordToggle" onclick="togglePassword()">
+            👁️
+          </button>
+        </div>
+      </div>
+      
+      <div class="checkbox-group">
+        <input type="checkbox" id="savePassword">
+        <label for="savePassword">שמור סיסמה</label>
+      </div>
+      
+      <button type="submit" class="login-btn" id="loginBtn">
+        התחבר
+      </button>
+    </form>
+  </div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  // Supabase client
+  const supabase = window.supabase.createClient(
+    "https://bneeivzzmfcslhwneccr.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuZWVpdnp6bWZjc2xod25lY2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNzMxMjcsImV4cCI6MjA3MTk0OTEyN30.7ojWOfMyaGDwBRt2qcl3sVoAaI5Dwn1wLXuhCxD6hpo"
+  );
+
+  // Check if already logged in
+  if (localStorage.getItem('isLoggedIn') === 'true') {
+    window.location.href = 'clients list.html';
+  }
+
+  // Load saved credentials
+  const savedUsername = localStorage.getItem('savedUsername');
+  const savedPassword = localStorage.getItem('savedPassword');
+  if (savedUsername && savedPassword) {
+    document.getElementById('username').value = savedUsername;
+    document.getElementById('password').value = savedPassword;
+    document.getElementById('savePassword').checked = true;
+  }
+
+  // Login form handler
+  document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+    const savePassword = document.getElementById('savePassword').checked;
+    const loginBtn = document.getElementById('loginBtn');
+    const errorMessage = document.getElementById('errorMessage');
+    
+    // Clear previous errors
+    errorMessage.style.display = 'none';
+    
+    if (!username || !password) {
+      showError('אנא הזן שם משתמש וסיסמה');
+      return;
+    }
+    
+    // Show loading state
+    loginBtn.disabled = true;
+    loginBtn.innerHTML = 'מתחבר... <span class="loading"></span>';
+    
+    try {
+      // Check credentials (hardcoded)
+      const validUsername = 'qais';
+      const validPassword = 'qais8080';
+      
+      if (username !== validUsername || password !== validPassword) {
+        throw new Error('שם משתמש או סיסמה שגויים');
+      }
+      
+      // Save credentials if checkbox is checked
+      if (savePassword) {
+        localStorage.setItem('savedUsername', username);
+        localStorage.setItem('savedPassword', password);
+      } else {
+        localStorage.removeItem('savedUsername');
+        localStorage.removeItem('savedPassword');
+      }
+      
+      // Mark as logged in
+      localStorage.setItem('isLoggedIn', 'true');
+      
+      // Redirect to clients list
+      window.location.href = 'clients list.html';
+      
+    } catch (error) {
+      console.error('Login error:', error);
+      showError(error.message || 'שגיאה בהתחברות');
+    } finally {
+      // Reset button state
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = 'התחבר';
+    }
+  });
+  
+  function showError(message) {
+    const errorMessage = document.getElementById('errorMessage');
+    errorMessage.textContent = message;
+    errorMessage.style.display = 'block';
+  }
+  
+  function togglePassword() {
+    const passwordInput = document.getElementById('password');
+    const passwordToggle = document.getElementById('passwordToggle');
+    
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      passwordToggle.textContent = '🙈';
+    } else {
+      passwordInput.type = 'password';
+      passwordToggle.textContent = '👁️';
+    }
+  }
+</script>
+</body>
+</html>
