@@ -71,6 +71,24 @@
       padding: 16px;
       margin-bottom: 12px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: all 0.2s ease;
+    }
+    
+    .client-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transform: translateY(-2px);
+      border-color: var(--accent);
+    }
+    
+    .phone-number {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+      transition: color 0.2s;
+    }
+    
+    .phone-number:hover {
+      color: #2563eb;
     }
     
     .card-header {
@@ -230,6 +248,7 @@
     <div class="toolbar">
       <div class="search"><input type="search" id="q" placeholder="חיפוש…" oninput="filterRows()"></div>
       <button class="btn primary" onclick="openAddModal()">+ הוסף לקוח</button>
+      <button class="btn" onclick="syncAllClientTotals()" title="סנכרן את כל הסכומים עם הטיפולים">🔄 סנכרן</button>
       <div class="pager">
         <button class="iconbtn" title="הקודם">❮</button>
         <span class="pagenum" id="pageNo">1</span>
@@ -278,11 +297,10 @@
   <div class="modal hidden" id="addModal">
     <div class="modal-content">
       <h3>הוסף לקוח חדש</h3>
-      <label>שם לקוח</label><input id="custName">
-      <label>טלפון</label><input id="custPhone">
-      <!-- requested: totals in the same popup -->
-      <label>סהוכ לתשלום (ILS)</label><input id="totalDue" type="number" step="0.01" placeholder="0">
-      <label>תקבולים (ILS)</label><input id="paidAmt" type="number" step="0.01" placeholder="0">
+      <label>שם לקוח *</label><input id="custName" required>
+      <label>טלפון</label><input id="custPhone" placeholder="050-1234567">
+      <label>עיר</label><input id="custCity" placeholder="תל אביב-יפו">
+      <label>תעודת זהות / כתובת</label><input id="custMeta" placeholder="123456789 או כתובת מלאה">
       <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
         <button class="btn" onclick="closeAddModal()">ביטול</button>
         <button class="btn" onclick="addClient()">שמור</button>
@@ -294,10 +312,10 @@
   <div class="modal hidden" id="editModal">
     <div class="modal-content">
       <h3>ערוך לקוח</h3>
-      <label>שם לקוח</label><input id="editCustName">
-      <label>טלפון</label><input id="editCustPhone">
-      <label>סהוכ לתשלום (ILS)</label><input id="editTotalDue" type="number" step="0.01" placeholder="0">
-      <label>תקבולים (ILS)</label><input id="editPaidAmt" type="number" step="0.01" placeholder="0">
+      <label>שם לקוח *</label><input id="editCustName" required>
+      <label>טלפון</label><input id="editCustPhone" placeholder="050-1234567">
+      <label>עיר</label><input id="editCustCity" placeholder="תל אביב-יפו">
+      <label>תעודת זהות / כתובת</label><input id="editCustMeta" placeholder="123456789 או כתובת מלאה">
       <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
         <button class="btn" onclick="closeEditModal()">ביטול</button>
         <button class="btn" onclick="saveClientEdit()">שמור</button>
@@ -313,11 +331,75 @@
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuZWVpdnp6bWZjc2xod25lY2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNzMxMjcsImV4cCI6MjA3MTk0OTEyN30.7ojWOfMyaGDwBRt2qcl3sVoAaI5Dwn1wLXuhCxD6hpo"
   );
 
+  // Column name constants - same as treatments page
+  const DUE_COL = 'סכום לתשלום';
+  const PAID_COL = 'תקבולים';
+
+  // Function to calculate client totals from treatments
+  async function calculateClientTotals(clientId) {
+    try {
+      console.log(`Calculating totals for client ${clientId}`);
+      const { data: treatments, error } = await supabase
+        .from('פעולות')
+        .select('*')
+        .eq('לקוח', clientId);
+      
+      if (error) throw error;
+      
+      console.log(`Found treatments for client ${clientId}:`, treatments);
+      
+      let totalDue = 0, totalPaid = 0;
+      (treatments || []).forEach(treatment => {
+        const due = Number(treatment[DUE_COL] || 0);
+        const paid = Number(treatment[PAID_COL] || 0);
+        totalDue += due;
+        totalPaid += paid;
+        console.log(`Treatment: Due=${due}, Paid=${paid}`);
+      });
+      
+      console.log(`Client ${clientId} totals: Due=${totalDue}, Paid=${totalPaid}`);
+      return { totalDue, totalPaid, hasTreatments: (treatments && treatments.length > 0) };
+    } catch (error) {
+      console.error('Error calculating client totals:', error);
+      return { totalDue: 0, totalPaid: 0, hasTreatments: false };
+    }
+  }
+
+  // Function to sync all client totals (useful for maintenance)
+  async function syncAllClientTotals() {
+    try {
+      const { data: clients, error } = await supabase
+        .from('לקוחות')
+        .select('מזהה');
+      
+      if (error) throw error;
+      
+      for (const client of (clients || [])) {
+        const { totalDue, totalPaid } = await calculateClientTotals(client['מזהה']);
+        
+        await supabase
+          .from('לקוחות')
+          .update({
+            'סהוכ לתשלום': totalDue,
+            'תקבולים': totalPaid
+          })
+          .eq('מזהה', client['מזהה']);
+      }
+      
+      console.log('All client totals synchronized successfully');
+      showToast('כל הסכומים סונכרנו בהצלחה!');
+    } catch (error) {
+      console.error('Error syncing all client totals:', error);
+      showToast('שגיאה בסנכרון הסכומים: ' + error.message, 'error');
+    }
+  }
+
+
   async function loadClients(){
     const { data, error } = await supabase
       .from("לקוחות")
       .select("*")
-      .order("שם לקוח", { ascending: true });
+      .order("מזהה", { ascending: false });
     if(error){ alert(error.message); return; }
     
     // Load table data
@@ -328,7 +410,16 @@
     const cardsContainer = document.querySelector("#cardsContainer");
     cardsContainer.innerHTML = "";
     
-    (data||[]).forEach(row=>{
+    // Process each client - calculate totals from treatments
+    for (const row of (data || [])) {
+      // Calculate totals from treatments for this client
+      const { totalDue, totalPaid } = await calculateClientTotals(row["מזהה"]);
+      
+      // Use calculated totals (this ensures sync with treatments page)
+      const finalTotalDue = totalDue;
+      const finalTotalPaid = totalPaid;
+      const balance = finalTotalDue - finalTotalPaid;
+      
       // Table row
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -338,12 +429,12 @@
             ${row["שם לקוח"]||""}
           </a>
         </td>
-        <td>${row["טלפון"]||""}</td>
-        <td class="num">₪ ${fmt(row["סהוכ לתשלום"])}</td>
-        <td class="num">₪ ${fmt(row["תקבולים"])}</td>
-        <td class="num">₪ ${fmt((row["סהוכ לתשלום"] || 0) - (row["תקבולים"] || 0))}</td>
+        <td><span class="phone-number" onclick="callClient('${row["טלפון"]||""}')" title="לחץ להתקשרות">${row["טלפון"]||""}</span></td>
+        <td class="num">₪ ${fmt(finalTotalDue)}</td>
+        <td class="num">₪ ${fmt(finalTotalPaid)}</td>
+        <td class="num">₪ ${fmt(balance)}</td>
         <td>
-          <button class="btn" onclick="editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', ${row["סהוכ לתשלום"]||0}, ${row["תקבולים"]||0})">✏️</button>
+          <button class="btn" onclick="editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', '${(row["עיר"]||"").replace(/'/g, "\\'")}', '${(row["תעודת זהות"]||"").replace(/'/g, "\\'")}')">✏️</button>
           <button class="btn" onclick="deleteClient(${row['מזהה']})">🗑</button>
         </td>
       `;
@@ -353,11 +444,18 @@
       const card = document.createElement("div");
       card.className = "client-card";
       card.setAttribute("data-client-id", row["מזהה"]);
+      card.style.cursor = "pointer";
+      card.onclick = function(e) {
+        // Don't navigate if clicking on buttons, phone numbers, or if user is trying to select text
+        if (e.target.tagName === 'BUTTON' || 
+            e.target.classList.contains('phone-number') || 
+            window.getSelection().toString().length > 0) {
+          return;
+        }
+        window.location.href = `treatments list.html?id=${row['מזהה']}`;
+      };
       
-      const totalDue = row["סהוכ לתשלום"] || 0;
-      const paid = row["תקבולים"] || 0;
-      const balance = totalDue - paid;
-      const progressPercent = totalDue > 0 ? (paid / totalDue) * 100 : 0;
+      const progressPercent = finalTotalDue > 0 ? (finalTotalPaid / finalTotalDue) * 100 : 0;
       
       // Determine progress bar color based on payment status
       let progressColor = "#10b981"; // Green for good progress
@@ -368,12 +466,10 @@
       card.innerHTML = `
         <div class="card-header">
           <h3 class="card-name">
-            <a href="treatments list.html?id=${row['מזהה']}" style="color: inherit; text-decoration: none;">
-              ${row["שם לקוח"]||""}
-            </a>
+            ${row["שם לקוח"]||""}
           </h3>
           <div class="card-id-phone">
-            מס' ${row["מזהה"]||""} • ${row["טלפון"]||""}
+            מס' ${row["מזהה"]||""} • <span class="phone-number" onclick="callClient('${row["טלפון"]||""}')" title="לחץ להתקשרות">${row["טלפון"]||""}</span>
           </div>
         </div>
         <div class="progress-bar">
@@ -382,11 +478,11 @@
         <div class="card-data">
           <div class="data-item">
             <div class="data-label">סה"כ</div>
-            <div class="data-value">₪ ${fmt(totalDue)}</div>
+            <div class="data-value">₪ ${fmt(finalTotalDue)}</div>
           </div>
           <div class="data-item">
             <div class="data-label">תקבולים</div>
-            <div class="data-value">₪ ${fmt(paid)}</div>
+            <div class="data-value">₪ ${fmt(finalTotalPaid)}</div>
           </div>
           <div class="data-item">
             <div class="data-label">יתרה</div>
@@ -395,11 +491,11 @@
         </div>
         <div class="card-actions">
           <button class="card-btn delete" onclick="deleteClient(${row['מזהה']})">מחיקה</button>
-          <button class="card-btn edit" onclick="editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', ${totalDue}, ${paid})">עריכה</button>
+          <button class="card-btn edit" onclick="editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', '${(row["עיר"]||"").replace(/'/g, "\\'")}', '${(row["תעודת זהות"]||"").replace(/'/g, "\\'")}')">עריכה</button>
         </div>
       `;
       cardsContainer.appendChild(card);
-    });
+    }
   }
 
   function fmt(v){ const n=Number(v||0); return n.toLocaleString('he-IL'); }
@@ -517,8 +613,8 @@
   async function addClient(){
     const name = document.getElementById("custName").value.trim();
     const phone = document.getElementById("custPhone").value.trim();
-    const total = Number(document.getElementById("totalDue").value||0);
-    const paid  = Number(document.getElementById("paidAmt").value||0);
+    const city = document.getElementById("custCity").value.trim();
+    const meta = document.getElementById("custMeta").value.trim();
     
     // Input validation
     if(!name){ 
@@ -535,20 +631,27 @@
     setLoading(saveBtn, true);
 
     try {
-      // Insert client with all financial data in one record
+      // Get the next sequential number
+      const nextNumber = await getNextClientNumber();
+      
+      // Insert client with sequential number and no initial financial data
+      // Financial data will be calculated from treatments only
       const { data: inserted, error: e1 } = await supabase
         .from("לקוחות")
         .insert([{ 
+          "מזהה": nextNumber,
           "שם לקוח": name, 
           "טלפון": phone,
-          "סהוכ לתשלום": total,
-          "תקבולים": paid
+          "עיר": city,
+          "תעודת זהות": meta,
+          "סהוכ לתשלום": 0,
+          "תקבולים": 0
         }])
         .select('"מזהה"')
         .single();
       if(e1) throw e1;
 
-      showToast("הלקוח נוסף בהצלחה!");
+      showToast(`הלקוח נוסף בהצלחה! מספר לקוח: ${nextNumber}`);
       closeAddModal();
       await loadClients();
     } catch (error) {
@@ -559,18 +662,100 @@
     }
   }
 
+  // Function to get the next sequential client number
+  async function getNextClientNumber() {
+    try {
+      const { data: clients, error } = await supabase
+        .from("לקוחות")
+        .select("מזהה")
+        .order("מזהה", { ascending: true });
+      
+      if (error) throw error;
+      
+      if (!clients || clients.length === 0) {
+        return 1; // First client
+      }
+      
+      // Find the next sequential number
+      let nextNumber = 1;
+      for (const client of clients) {
+        if (client["מזהה"] === nextNumber) {
+          nextNumber++;
+        } else {
+          break; // Found a gap, use this number
+        }
+      }
+      
+      return nextNumber;
+    } catch (error) {
+      console.error('Error getting next client number:', error);
+      return 1; // Fallback
+    }
+  }
+
   async function deleteClient(id){
     if(!confirm("למחוק לקוח זה?")) return;
     
     try {
-      const { error } = await supabase.from("לקוחות").delete().eq("מזהה", id);
-      if(error) throw error;
+      // First delete the client
+      const { error: deleteError } = await supabase.from("לקוחות").delete().eq("מזהה", id);
+      if(deleteError) throw deleteError;
+      
+      // Also delete all treatments for this client
+      const { error: deleteTreatmentsError } = await supabase.from("פעולות").delete().eq("לקוח", id);
+      if(deleteTreatmentsError) {
+        console.warn('Error deleting treatments for client:', deleteTreatmentsError);
+        // Don't throw error here, client is already deleted
+      }
+      
+      // Renumber remaining clients to maintain sequential order
+      await renumberClients();
       
       showToast("הלקוח נמחק בהצלחה!");
+      
+      // Reload clients to refresh the display
       await loadClients();
     } catch (error) {
       console.error('Error deleting client:', error);
       showToast("שגיאה במחיקת הלקוח: " + error.message, "error");
+    }
+  }
+
+  // Function to renumber all clients sequentially
+  async function renumberClients() {
+    try {
+      // Get all clients ordered by current ID
+      const { data: clients, error } = await supabase
+        .from("לקוחות")
+        .select("*")
+        .order("מזהה", { ascending: true });
+      
+      if (error) throw error;
+      
+      // Renumber clients sequentially starting from 1
+      for (let i = 0; i < clients.length; i++) {
+        const newNumber = i + 1;
+        const currentNumber = clients[i]["מזהה"];
+        
+        if (currentNumber !== newNumber) {
+          // Update client ID
+          await supabase
+            .from("לקוחות")
+            .update({ "מזהה": newNumber })
+            .eq("מזהה", currentNumber);
+          
+          // Update all treatments for this client
+          await supabase
+            .from("פעולות")
+            .update({ "לקוח": newNumber })
+            .eq("לקוח", currentNumber);
+        }
+      }
+      
+      console.log("Clients renumbered successfully");
+    } catch (error) {
+      console.error('Error renumbering clients:', error);
+      // Don't show error to user as this is a background operation
     }
   }
 
@@ -657,20 +842,20 @@
     // Clear form
     document.getElementById("custName").value = "";
     document.getElementById("custPhone").value = "";
-    document.getElementById("totalDue").value = "";
-    document.getElementById("paidAmt").value = "";
+    document.getElementById("custCity").value = "";
+    document.getElementById("custMeta").value = "";
   }
   function closeAddModal(){ document.getElementById("addModal").classList.add("hidden"); }
 
   // Edit client functionality
   let currentEditId = null;
   
-  function editClient(id, name, phone, total, paid) {
+  function editClient(id, name, phone, city, meta) {
     currentEditId = id;
     document.getElementById("editCustName").value = name;
     document.getElementById("editCustPhone").value = phone;
-    document.getElementById("editTotalDue").value = total;
-    document.getElementById("editPaidAmt").value = paid;
+    document.getElementById("editCustCity").value = city || '';
+    document.getElementById("editCustMeta").value = meta || '';
     document.getElementById("editModal").classList.remove("hidden");
   }
   
@@ -682,8 +867,8 @@
   async function saveClientEdit() {
     const name = document.getElementById("editCustName").value.trim();
     const phone = document.getElementById("editCustPhone").value.trim();
-    const total = Number(document.getElementById("editTotalDue").value || 0);
-    const paid = Number(document.getElementById("editPaidAmt").value || 0);
+    const city = document.getElementById("editCustCity").value.trim();
+    const meta = document.getElementById("editCustMeta").value.trim();
     
     if (!name) {
       showToast("שם הלקוח הוא שדה חובה", "error");
@@ -701,8 +886,9 @@
         .update({ 
           "שם לקוח": name, 
           "טלפון": phone,
-          "סהוכ לתשלום": total,
-          "תקבולים": paid
+          "עיר": city,
+          "תעודת זהות": meta
+          // Note: Not updating financial fields - they're calculated from treatments
         })
         .eq("מזהה", currentEditId);
       
@@ -729,6 +915,38 @@
     localStorage.removeItem('savedPassword');
     window.location.href = 'login.html';
   }
+
+  // Function to initiate phone call
+  function callClient(phoneNumber) {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      showToast('מספר טלפון לא זמין', 'error');
+      return;
+    }
+    
+    // Remove any non-digit characters except + for international numbers
+    const cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
+    
+    // Create tel: link
+    const telLink = `tel:${cleanNumber}`;
+    
+    // Open phone dialer
+    window.open(telLink, '_self');
+  }
+
+  // Refresh clients list when page loads (in case returning from treatments page)
+  window.addEventListener('pageshow', function(event) {
+    if (event.persisted) {
+      // Page was loaded from cache, refresh the data
+      loadClients();
+    }
+  });
+
+  // Also refresh when page becomes visible (user switches back to tab)
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      loadClients();
+    }
+  });
 
   loadClients();
 </script>
