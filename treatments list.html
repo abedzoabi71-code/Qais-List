@@ -583,6 +583,7 @@
 
     <div class="toolbar">
       <button class="btn primary" id="addBtn">+ הוסף טיפול</button>
+      <button class="btn" onclick="updateClientTotals()" title="עדכן את סכומי הלקוח">🔄 עדכן סכומים</button>
       <div class="search"><input id="q" placeholder="חיפוש בשורות…" oninput="filterRows()"></div>
     </div>
 
@@ -605,7 +606,7 @@
             <th>אזור טיפול</th>
             <th>תאריך</th>
             <th class="num">סכום לתשלום</th>
-            <th class="num">שולם על חשבון</th>
+            <th class="num">תקבולים</th>
             <th>יתרה</th>
             <th>אופן תשלום</th>
           </tr>
@@ -648,7 +649,7 @@
             <div class="treatment-data-value">₪ 350</div>
           </div>
           <div class="treatment-data-item">
-            <div class="treatment-data-label">שולם על חשבון</div>
+            <div class="treatment-data-label">תקבולים</div>
             <div class="treatment-data-value">₪ 200</div>
           </div>
           <div class="treatment-data-item">
@@ -689,7 +690,7 @@
           <input id="f_due" type="number" min="0" step="0.5" placeholder="0">
         </div>
         <div>
-          <label>שולם על חשבון (₪)</label>
+          <label>תקבולים (₪)</label>
           <input id="f_paid" type="number" min="0" step="0.5" placeholder="0">
         </div>
         <div>
@@ -739,7 +740,7 @@
     
     // Column name constants - UPDATE THESE TO MATCH YOUR SUPABASE TABLE
     const DUE_COL = 'סכום לתשלום';
-    const PAID_COL = 'שולם על חשבון';
+    const PAID_COL = 'תקבולים';
     const INFO_COL = 'מידע על הטיפול';
     const AREA_COL = 'אזור טיפול';
     const DATE_COL = 'תאריך';
@@ -1023,6 +1024,53 @@
       }
     }
 
+    // Function to update client financial totals in the database
+    async function updateClientTotals() {
+      const id = clientId();
+      try {
+        console.log(`Updating client totals for client ID: ${id}`);
+        
+        // Calculate totals from all treatments for this client
+        const { data: acts, error } = await supabase
+          .from('פעולות')
+          .select(`${DUE_COL}, ${PAID_COL}`)
+          .eq(CLIENT_COL, id);
+        
+        if (error) throw error;
+        
+        console.log(`Found ${acts ? acts.length : 0} treatments for client ${id}`);
+        
+        let totalDue = 0, totalPaid = 0;
+        (acts || []).forEach(act => {
+          const due = Number(act[DUE_COL] || 0);
+          const paid = Number(act[PAID_COL] || 0);
+          totalDue += due;
+          totalPaid += paid;
+          console.log(`Treatment: Due=${due}, Paid=${paid}`);
+        });
+        
+        console.log(`Total calculated: Due=${totalDue}, Paid=${totalPaid}`);
+        
+        // Always update client totals when treatments are modified
+        // This ensures the client totals reflect the current treatment data
+        const { error: updateError } = await supabase
+          .from('לקוחות')
+          .update({
+            'סהוכ לתשלום': totalDue,
+            'תקבולים': totalPaid
+          })
+          .eq('מזהה', id);
+        
+        if (updateError) throw updateError;
+        
+        console.log(`Successfully updated client ${id} totals: Due=${totalDue}, Paid=${totalPaid}`);
+        showSuccess(`סכומי הלקוח עודכנו: ₪${totalDue} לתשלום, ₪${totalPaid} תקבולים`);
+      } catch (error) {
+        console.error('Error updating client totals:', error);
+        showError('שגיאה בעדכון סכומי הלקוח: ' + error.message);
+      }
+    }
+
     async function loadSessions(){
       if (USE_POCKETBASE) return pbLoadSessions();
       const id = clientId();
@@ -1100,7 +1148,7 @@
                 <div class="treatment-data-value">₪ ${fmt(due)}</div>
               </div>
               <div class="treatment-data-item">
-                <div class="treatment-data-label">שולם על חשבון</div>
+                <div class="treatment-data-label">תקבולים</div>
                 <div class="treatment-data-value">₪ ${fmt(got)}</div>
               </div>
               <div class="treatment-data-item">
@@ -1200,16 +1248,11 @@
             [PAYTYPE_COL]: document.getElementById('f_paytype').value || null
           };
           
-          // Use RPC function for updating, similar to adding
-          const { data, error } = await supabase.rpc('ui_update_treatment', {
-            p_id: Number(currentEditId),
-            p_info: updateData[INFO_COL],
-            p_area: updateData[AREA_COL],
-            p_date: updateData[DATE_COL],
-            p_due: updateData[DUE_COL],
-            p_paid: updateData[PAID_COL],
-            p_paytype: updateData[PAYTYPE_COL]
-          });
+          // Use direct table update instead of RPC function
+          const { data, error } = await supabase
+            .from('פעולות')
+            .update(updateData)
+            .eq('מזהה', Number(currentEditId));
           
           if (error) {
             console.error('Supabase update error:', error);
@@ -1221,6 +1264,8 @@
           closeModal();
           // Force refresh the data
           await loadSessions();
+          // Update client totals in the database
+          await updateClientTotals();
           currentEditId = null;
         } catch (error) {
           console.error('Error updating treatment:', error);
@@ -1241,19 +1286,35 @@
         };
         
         try {
-          // Use a uniquely named RPC function that does not require "סוג רשומה"
-          const { error: rpcError } = await supabase.rpc('ui_insert_treatment_simple', args);
-          if (rpcError) throw rpcError;
+          // Use direct table insert instead of RPC function
+          const { error: insertError } = await supabase
+            .from('פעולות')
+            .insert({
+              [CLIENT_COL]: id,
+              [INFO_COL]: document.getElementById('f_info').value || null,
+              [AREA_COL]: selectedAreas.join(', '),
+              [DATE_COL]: document.getElementById('f_date').value || todayISO(),
+              [DUE_COL]: Number(document.getElementById('f_due').value||0),
+              [PAID_COL]: Number(document.getElementById('f_paid').value||0),
+              [PAYTYPE_COL]: document.getElementById('f_paytype').value || null
+            });
+          if (insertError) throw insertError;
           
           closeModal();
           loadSessions();
+          // Update client totals in the database
+          await updateClientTotals();
           showSuccess('הטיפול נוסף בהצלחה');
         } catch (error) {
           console.error('Error saving treatment:', error);
           
-          // Handle foreign key constraint error specifically
+          // Handle specific error types
           if (error.message && error.message.includes('violates foreign key constraint')) {
-            showError('שגיאה: לא ניתן להוסיף טיפול כרגע. ייתכן שיש בעיה בהגדרות המערכת. נסה שוב מאוחר יותר או פנה לתמיכה.');
+            showError(`שגיאה: בעיה בקשר בין הטיפול ללקוח. מזהה לקוח: ${id}. בדוק שהלקוח קיים במערכת.`);
+          } else if (error.message && error.message.includes('duplicate key')) {
+            showError('שגיאה: הטיפול כבר קיים במערכת.');
+          } else if (error.message && error.message.includes('not-null')) {
+            showError('שגיאה: שדה חובה חסר. בדוק שכל השדות הנדרשים מולאו.');
           } else {
             showError('שגיאה בשמירת הטיפול: ' + error.message);
           }
@@ -1280,6 +1341,8 @@
         const { error } = await supabase.from('פעולות').delete().eq('מזהה', id);
         if(error) throw error;
         loadSessions();
+        // Update client totals in the database
+        await updateClientTotals();
         showSuccess('הטיפול נמחק בהצלחה');
       } catch (error) {
         console.error('Error deleting treatment:', error);
