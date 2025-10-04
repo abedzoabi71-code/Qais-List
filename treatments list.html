@@ -56,7 +56,7 @@
     .modal{position:fixed;inset:0;background:rgba(2,6,23,.35);display:flex;align-items:center;justify-content:center;z-index:9999}
     .modal.hidden{display:none}
     .modal .panel{width:min(700px,94vw);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;position:relative;z-index:10000}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     .grid .col-2{grid-column:span 2}
     .grid .col-3{grid-column:span 3}
     label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
@@ -591,6 +591,7 @@
       <table id="sessions">
         <colgroup>
           <col class="col-action shrink">
+          <col class="col-number shrink">
           <col class="col-info" style="width:25%">
           <col class="col-area" style="width:20%">
           <col class="col-date shrink">
@@ -602,6 +603,7 @@
         <thead>
           <tr>
             <th>פעולה</th>
+            <th class="num">מס' טיפול</th>
             <th>מידע על הטיפול</th>
             <th>אזור טיפול</th>
             <th>תאריך</th>
@@ -618,6 +620,7 @@
               <button class="iconbtn" title="עריכה" onclick="editTreatment('example')" style="margin-left: 4px;">✏️</button>
               <button class="iconbtn danger" title="מחק" onclick="del('example')">🗑</button>
             </td>
+            <td class="num">1</td>
             <td>טיפול שגרתי להקלה על כאבי גב תחתון עם תיאור ארוך לדוגמה שמדגים חיתוך טקסט אחרי שתי שורות</td>
             <td>גב, כתפיים</td>
             <td>07/09/25</td>
@@ -636,7 +639,7 @@
       <div class="treatment-card">
         <div class="treatment-header">
           <div class="treatment-info">
-            <h3 class="treatment-title">טיפול שגרתי להקלה על כאבי גב תחתון</h3>
+            <h3 class="treatment-title">טיפול #1 - טיפול שגרתי להקלה על כאבי גב תחתון</h3>
             <div class="treatment-meta">
               <span>📅 07/09/25</span>
               <span>💳 מזומן</span>
@@ -677,13 +680,18 @@
     <div class="panel">
       <h2 style="margin:0 0 10px">הוספת טיפול</h2>
       <div class="grid">
-        <div class="col-3">
+        <div class="col-2">
           <label>מידע על הטיפול</label>
           <textarea id="f_info" placeholder="תיאור קצר"></textarea>
         </div>
         <div>
           <label>תאריך</label>
           <input id="f_date" type="date">
+        </div>
+        <div>
+          <label>תאריך טיפול הבא</label>
+          <input id="f_next_date" type="date" readonly style="background-color: #f3f4f6; color: #6b7280;">
+          <small style="font-size: 11px; color: #6b7280;">מומלץ על פי סוג הטיפול</small>
         </div>
         <div>
           <label>סה"כ לתשלום (₪)</label>
@@ -739,13 +747,14 @@
     const successMessage = document.getElementById('successMessage');
     
     // Column name constants - UPDATE THESE TO MATCH YOUR SUPABASE TABLE
-    const DUE_COL = 'סכום לתשלום';
+    const DUE_COL = 'סכום לתשלום'; // Column name with space as expected by database
     const PAID_COL = 'תקבולים';
     const INFO_COL = 'מידע על הטיפול';
     const AREA_COL = 'אזור טיפול';
     const DATE_COL = 'תאריך';
     const PAYTYPE_COL = 'אופן תשלום';
     const CLIENT_COL = 'לקוח';
+    const ID_COL = 'מזהה'; // ID column name
     // Using Hebrew schema only
     
     // Multi-select variables
@@ -768,6 +777,66 @@
       const d = new Date();
       const p = n => String(n).padStart(2,'0');
       return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+    }
+    
+    // Treatment scheduling functions
+    function isFaceTreatment(areas) {
+      const faceAreas = ['פנים', 'עיניים', 'אף', 'פה', 'לסת', 'אוזניים', 'קרקפת'];
+      return areas.some(area => faceAreas.includes(area));
+    }
+    
+    function isBodyTreatment(areas) {
+      const bodyAreas = ['גב', 'רגליים', 'ידיים', 'בית שחי', 'צוואר', 'כתפיים', 'חזה', 'בטן', 'אגן', 'ישבן', 'ירכיים', 'ברכיים', 'שוקיים', 'קרסוליים', 'כפות רגליים', 'מפשעה', 'אמה', 'מרפק', 'כף יד', 'אצבעות', 'גב תחתון', 'גב עליון', 'מותן'];
+      return areas.some(area => bodyAreas.includes(area));
+    }
+    
+    function getNextTreatmentDate(currentDate, areas) {
+      const date = new Date(currentDate);
+      if (isFaceTreatment(areas)) {
+        // Face treatment: next appointment in 1 month
+        date.setMonth(date.getMonth() + 1);
+      } else if (isBodyTreatment(areas)) {
+        // Body treatment: next appointment in 2 months
+        date.setMonth(date.getMonth() + 2);
+      } else {
+        // Default: 1 month
+        date.setMonth(date.getMonth() + 1);
+      }
+      
+      const p = n => String(n).padStart(2,'0');
+      return `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}`;
+    }
+    
+    function updateNextTreatmentDate() {
+      const currentDate = document.getElementById('f_date').value;
+      const areas = selectedAreas;
+      
+      if (currentDate && areas.length > 0) {
+        const nextDate = getNextTreatmentDate(currentDate, areas);
+        document.getElementById('f_next_date').value = nextDate;
+        
+        // Show treatment type info
+        let treatmentType = '';
+        if (isFaceTreatment(areas)) {
+          treatmentType = 'טיפול פנים - מומלץ חודש';
+        } else if (isBodyTreatment(areas)) {
+          treatmentType = 'טיפול גוף - מומלץ חודשיים';
+        } else {
+          treatmentType = 'טיפול כללי - מומלץ חודש';
+        }
+        
+        // Update the small text
+        const smallText = document.querySelector('#f_next_date + small');
+        if (smallText) {
+          smallText.textContent = treatmentType;
+        }
+      } else {
+        document.getElementById('f_next_date').value = '';
+        const smallText = document.querySelector('#f_next_date + small');
+        if (smallText) {
+          smallText.textContent = 'מומלץ על פי סוג הטיפול';
+        }
+      }
     }
     function qs(p){ return (new URLSearchParams(location.search)).get(p); }
     function clientId(){ return Number(qs('id')||0); }
@@ -830,6 +899,7 @@
       }
       
       updateSelectedAreasDisplay();
+      updateNextTreatmentDate(); // Update next treatment date when areas change
       
       // Update options in dropdown to show selected state
       const options = areaDropdown.querySelectorAll('.multiselect-option');
@@ -945,7 +1015,7 @@
         const idPart = c.id_number || '';
         const addressPart = c.address || '';
         document.getElementById('cMeta').value = idPart + (addressPart ? ' · ' + addressPart : '');
-        document.getElementById('today').textContent = new Date().toLocaleDateString('he-IL');
+        // Removed reference to non-existent 'today' element
       } catch (error) {
         console.error('PB load client error:', error);
         showError('שגיאה בטעינת נתוני הלקוח (PB): ' + (error?.message||error));
@@ -978,7 +1048,7 @@
         document.getElementById('cMeta').value = idPart + (addressPart ? ' · ' + addressPart : '');
         document.getElementById('mobileCMeta').value = idPart + (addressPart ? ' · ' + addressPart : '');
         
-        document.getElementById('today').textContent = new Date().toLocaleDateString('he-IL');
+        // Removed reference to non-existent 'today' element
       } catch (error) {
         console.error('Error loading client:', error);
         showError('שגיאה בטעינת נתוני הלקוח: ' + error.message);
@@ -1030,13 +1100,22 @@
       try {
         console.log(`Updating client totals for client ID: ${id}`);
         
+        // Check if Supabase is available
+        if (!supabase) {
+          console.warn('Supabase not available, skipping client totals update');
+          return;
+        }
+        
         // Calculate totals from all treatments for this client
         const { data: acts, error } = await supabase
           .from('פעולות')
           .select(`${DUE_COL}, ${PAID_COL}`)
           .eq(CLIENT_COL, id);
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching treatments for totals:', error);
+          throw error;
+        }
         
         console.log(`Found ${acts ? acts.length : 0} treatments for client ${id}`);
         
@@ -1056,12 +1135,15 @@
         const { error: updateError } = await supabase
           .from('לקוחות')
           .update({
-            'סהוכ לתשלום': totalDue,
+            'סה״כ לתשלום': totalDue,
             'תקבולים': totalPaid
           })
           .eq('מזהה', id);
         
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Error updating client totals in database:', updateError);
+          throw updateError;
+        }
         
         console.log(`Successfully updated client ${id} totals: Due=${totalDue}, Paid=${totalPaid}`);
         showSuccess(`סכומי הלקוח עודכנו: ₪${totalDue} לתשלום, ₪${totalPaid} תקבולים`);
@@ -1080,7 +1162,7 @@
           .select('*')
           .eq(CLIENT_COL, id)
           .order(DATE_COL, { ascending: false })
-          .order('מזהה', { ascending: false });
+          .order(ID_COL, { ascending: false });
         
         if(error) throw error;
 
@@ -1095,19 +1177,24 @@
         currentTreatmentsData = acts || [];
         
         let total=0, paid=0;
-        (acts||[]).forEach(r=>{
+        (acts||[]).forEach((r, index)=>{
           const due  = Number(r[DUE_COL] || 0);
           const got  = Number(r[PAID_COL]|| 0);
           total += due; paid += got;
           const bal = due - got;
+          const treatmentNumber = index + 1; // Auto-incrementing treatment number
+          
+          // Debug: Check what ID we're getting
+          console.log('Treatment ID for buttons:', r[ID_COL], 'Type:', typeof r[ID_COL]);
           
           // Table row
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>
-              <button class="iconbtn" title="עריכה" onclick="editTreatment(${r['מזהה']})" style="margin-left: 4px;">✏️</button>
-              <button class="iconbtn danger" title="מחק" onclick="del(${r['מזהה']})">🗑</button>
+              <button class="iconbtn" title="עריכה" onclick="editTreatment('${r[ID_COL] || r.id || r.ID || ''}')" style="margin-left: 4px;">✏️</button>
+              <button class="iconbtn danger" title="מחק" onclick="del('${r[ID_COL] || r.id || r.ID || ''}')">🗑</button>
             </td>
+            <td class="num">${treatmentNumber}</td>
             <td>${r[INFO_COL]||''}</td>
             <td>${r[AREA_COL]||''}</td>
             <td>${r[DATE_COL] ? new Date(r[DATE_COL]).toLocaleDateString('he-IL',{year:'2-digit',month:'2-digit',day:'2-digit'}) : ''}</td>
@@ -1121,7 +1208,7 @@
           // Treatment card
           const card = document.createElement('div');
           card.className = 'treatment-card';
-          card.setAttribute('data-treatment-id', r['מזהה']);
+          card.setAttribute('data-treatment-id', r[ID_COL]);
           
           const treatmentInfo = r[INFO_COL] || '';
           const area = r[AREA_COL] || '';
@@ -1135,7 +1222,7 @@
           card.innerHTML = `
             <div class="treatment-header">
               <div class="treatment-info">
-                <h3 class="treatment-title">${treatmentInfo}</h3>
+                <h3 class="treatment-title">טיפול #${treatmentNumber} - ${treatmentInfo}</h3>
                 <div class="treatment-meta">
                   <span>📅 ${date}</span>
                   ${payType ? `<span>💳 ${payType}</span>` : ''}
@@ -1159,8 +1246,8 @@
             <div class="treatment-details">
               <div class="treatment-areas">${areaBubbles}</div>
               <div class="treatment-actions">
-                <button class="card-btn edit" onclick="editTreatment(${r['מזהה']})">עריכה</button>
-                <button class="card-btn delete" onclick="del(${r['מזהה']})">מחיקה</button>
+                <button class="card-btn edit" onclick="editTreatment('${r[ID_COL] || r.id || r.ID || ''}')">עריכה</button>
+                <button class="card-btn delete" onclick="del('${r[ID_COL] || r.id || r.ID || ''}')">מחיקה</button>
               </div>
             </div>
           `;
@@ -1204,11 +1291,15 @@
       document.getElementById('f_due').value = '';
       document.getElementById('f_paid').value = '';
       document.getElementById('f_paytype').value = '';
+      document.getElementById('f_next_date').value = '';
       setTimeout(()=>document.getElementById('f_info').focus(), 0);
     }
     function closeModal(){ modal.classList.add('hidden'); }
     addBtn.addEventListener('click', openModal);
     cancelBtn.addEventListener('click', closeModal);
+    
+    // Add event listener for date field to update next treatment date
+    document.getElementById('f_date').addEventListener('change', updateNextTreatmentDate);
 
     async function pbSave(){
       const id = qs('id');
@@ -1249,15 +1340,21 @@
           };
           
           // Use direct table update instead of RPC function
+          console.log('Updating treatment with ID:', currentEditId, 'Type:', typeof currentEditId);
+          console.log('Update data:', updateData);
+          console.log('Using column:', ID_COL, 'with value:', Number(currentEditId));
+          
           const { data, error } = await supabase
             .from('פעולות')
             .update(updateData)
-            .eq('מזהה', Number(currentEditId));
+            .eq(ID_COL, Number(currentEditId));
           
           if (error) {
             console.error('Supabase update error:', error);
             throw error;
           }
+          
+          console.log('Update successful, data:', data);
           
           showSuccess('הטיפול עודכן בהצלחה');
           
@@ -1265,7 +1362,7 @@
           // Force refresh the data
           await loadSessions();
           // Update client totals in the database
-          await updateClientTotals();
+          // await updateClientTotals(); // Temporarily disabled to test edit functionality
           currentEditId = null;
         } catch (error) {
           console.error('Error updating treatment:', error);
@@ -1303,7 +1400,7 @@
           closeModal();
           loadSessions();
           // Update client totals in the database
-          await updateClientTotals();
+          // await updateClientTotals(); // Temporarily disabled to test edit functionality
           showSuccess('הטיפול נוסף בהצלחה');
         } catch (error) {
           console.error('Error saving treatment:', error);
@@ -1338,11 +1435,11 @@
       if (USE_POCKETBASE) return pbDel(id);
       if(!confirm('למחוק טיפול זה?')) return;
       try {
-        const { error } = await supabase.from('פעולות').delete().eq('מזהה', id);
+        const { error } = await supabase.from('פעולות').delete().eq(ID_COL, id);
         if(error) throw error;
         loadSessions();
         // Update client totals in the database
-        await updateClientTotals();
+        // await updateClientTotals(); // Temporarily disabled to test edit functionality
         showSuccess('הטיפול נמחק בהצלחה');
       } catch (error) {
         console.error('Error deleting treatment:', error);
@@ -1370,16 +1467,26 @@
     let currentEditId = null;
     
     function editTreatment(id) {
+      console.log('editTreatment called with ID:', id, 'Type:', typeof id);
       currentEditId = id;
       
       // Find the treatment data from the current sessions
       const treatments = getCurrentTreatments();
-      const treatment = treatments.find(t => t['מזהה'] == id || t['מזהה'] == Number(id));
+      console.log('Found treatments:', treatments.length);
+      console.log('All treatment IDs:', treatments.map(t => ({ id: t[ID_COL], type: typeof t[ID_COL] })));
+      
+      const treatment = treatments.find(t => {
+        const treatmentId = t[ID_COL];
+        console.log('Comparing:', { treatmentId, id, match: treatmentId == id || treatmentId == Number(id) || String(treatmentId) === String(id) });
+        return treatmentId == id || treatmentId == Number(id) || String(treatmentId) === String(id);
+      });
+      
+      console.log('Found treatment:', treatment);
       
       // For example/demo purposes, create a mock treatment if not found
       if (!treatment && id === 'example') {
         const mockTreatment = {
-          'מזהה': 'example',
+          [ID_COL]: 'example',
           [INFO_COL]: 'טיפול שגרתי להקלה על כאבי גב תחתון עם תיאור ארוך לדוגמה שמדגים חיתוך טקסט אחרי שתי שורות',
           [AREA_COL]: 'גב, כתפיים',
           [DATE_COL]: '2025-09-07',
@@ -1425,11 +1532,13 @@
       }
       
       // Fill the modal with existing data
+      console.log('Filling modal with treatment data:', treatment);
       document.getElementById('f_info').value = treatment[INFO_COL] || '';
       document.getElementById('f_date').value = treatment[DATE_COL] || todayISO();
       document.getElementById('f_due').value = treatment[DUE_COL] || '';
       document.getElementById('f_paid').value = treatment[PAID_COL] || '';
       document.getElementById('f_paytype').value = treatment[PAYTYPE_COL] || '';
+      document.getElementById('f_next_date').value = ''; // Clear next date for editing
       
       // Handle areas - split comma-separated values
       selectedAreas.length = 0;
@@ -1438,6 +1547,7 @@
         selectedAreas.push(...areas);
       }
       updateSelectedAreasDisplay();
+      updateNextTreatmentDate(); // Update next treatment date for existing treatment
       
       // Update options in dropdown
       const options = areaDropdown.querySelectorAll('.multiselect-option');
@@ -1450,6 +1560,7 @@
       document.getElementById('save').textContent = 'עדכן';
       
       // Show modal
+      console.log('Opening modal for editing...');
       modal.classList.remove('hidden');
       setTimeout(() => document.getElementById('f_info').focus(), 0);
     }
