@@ -354,7 +354,7 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
   // Supabase client (your project credentials)
-  const supabase = window.supabase.createClient(
+  supabase = window.supabase.createClient(
     "https://bneeivzzmfcslhwneccr.supabase.co",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuZWVpdnp6bWZjc2xod25lY2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNzMxMjcsImV4cCI6MjA3MTk0OTEyN30.7ojWOfMyaGDwBRt2qcl3sVoAaI5Dwn1wLXuhCxD6hpo"
   );
@@ -1032,14 +1032,14 @@
 
   // Check if logged in
   if (localStorage.getItem('isLoggedIn') !== 'true') {
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
   }
 
   function logout() {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('savedUsername');
     localStorage.removeItem('savedPassword');
-    window.location.href = 'login.html';
+    window.location.href = 'index.html';
   }
 
   // Function to initiate phone call
