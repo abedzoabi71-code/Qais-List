@@ -732,7 +732,7 @@
   <script>
     const { createClient } = window.supabase;
     const USE_POCKETBASE = false; // set to true to use PocketBase backend
-    const supabase = createClient(
+    supabase = createClient(
       "https://bneeivzzmfcslhwneccr.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJuZWVpdnp6bWZjc2xod25lY2NyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYzNzMxMjcsImV4cCI6MjA3MTk0OTEyN30.7ojWOfMyaGDwBRt2qcl3sVoAaI5Dwn1wLXuhCxD6hpo"
     );
@@ -1574,7 +1574,7 @@
 
     // Check if logged in
     if (localStorage.getItem('isLoggedIn') !== 'true') {
-      window.location.href = 'login.html';
+      window.location.href = 'index.html';
     }
 
     (async function init(){
