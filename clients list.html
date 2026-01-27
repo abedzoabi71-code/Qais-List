@@ -520,8 +520,8 @@
           </div>
         </div>
         <div class="card-actions">
-          <button class="card-btn delete" onclick="deleteClient(${row['מזהה']})">מחיקה</button>
-          <button class="card-btn edit" onclick="editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', '${(row["עיר"]||"").replace(/'/g, "\\'")}', '${(row["תעודת זהות"]||"").replace(/'/g, "\\'")}', '${row["מגדר"]||""}')">עריכה</button>
+          <button class="card-btn delete" onclick="event.stopPropagation(); deleteClient(${row['מזהה']})">מחיקה</button>
+          <button class="card-btn edit" onclick="event.stopPropagation(); editClient(${row['מזהה']}, '${(row["שם לקוח"]||"").replace(/'/g, "\\'")}', '${(row["טלפון"]||"").replace(/'/g, "\\'")}', '${(row["עיר"]||"").replace(/'/g, "\\'")}', '${(row["תעודת זהות"]||"").replace(/'/g, "\\'")}', '${row["מגדר"]||""}')">עריכה</button>
         </div>
       `;
       cardsContainer.appendChild(card);
@@ -949,6 +949,19 @@
     
     // Update label text
     label.textContent = editClientGender === 'male' ? 'זכר' : 'נקבה';
+  }
+
+  function updateEditClientGenderDisplay() {
+    const toggle = document.getElementById('editClientGenderToggle');
+    const label = document.getElementById('editClientGenderLabel');
+    
+    if (editClientGender === 'female') {
+      toggle.classList.add('active');
+      label.textContent = 'נקבה';
+    } else {
+      toggle.classList.remove('active');
+      label.textContent = 'זכר';
+    }
   }
 
   function filterRows(){
